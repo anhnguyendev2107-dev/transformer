@@ -109,6 +109,44 @@ def evaluate(model: Transformer, n: int = 5) -> float:
     return correct / n
 
 
+def predict_one(model: Transformer, seq: list[int]) -> list[int]:
+    """Sinh kết quả cho một chuỗi đơn cụ thể (để demo những test case cố định)."""
+    src = torch.tensor([seq], dtype=torch.long, device=DEVICE)
+    pred = greedy_decode(model, src, max_len=len(seq) + 2)
+    return trim(pred[0].tolist())
+
+
+def final_demo(model: Transformer) -> None:
+    """Chạy thử vài test case cố định + đo accuracy trên batch lớn ngẫu nhiên."""
+    print("\n" + "=" * 60)
+    print("DEMO sau khi train")
+    print("=" * 60)
+
+    # 1) Test case cố định — giúp user thấy hành vi ổn định, không phụ thuộc seed batch
+    fixed_cases: list[list[int]] = [
+        [3, 4, 5, 6, 7],
+        [10, 9, 8, 7, 6, 5],
+        [14, 3, 14, 3, 14],
+        [5, 5, 5, 5],
+        [3, 14, 7, 11, 4, 9, 8],
+    ]
+    print("\n[Test case cố định]")
+    for s in fixed_cases:
+        gold = list(reversed(s))
+        got = predict_one(model, s)
+        ok = "OK" if got == gold else "X "
+        print(f"  {ok}  src={s}  →  pred={got}  (gold={gold})")
+
+    # 2) Accuracy trên batch ngẫu nhiên lớn để có con số tin cậy
+    print("\n[Accuracy trên 200 ví dụ ngẫu nhiên]")
+    src, _, tgt_out = make_batch(200, DEVICE)
+    pred = greedy_decode(model, src, max_len=MAX_LEN + 2)
+    correct = sum(
+        trim(pred[i].tolist()) == trim(tgt_out[i].tolist()) for i in range(src.size(0))
+    )
+    print(f"  exact-match acc = {correct}/{src.size(0)} = {correct / src.size(0):.3f}")
+
+
 def main() -> None:
     set_seed(SEED)
     print(f"Reverse task | vocab={VOCAB_SIZE} | seq_len {MIN_LEN}..{MAX_LEN} | device={DEVICE}")
@@ -141,6 +179,8 @@ def main() -> None:
             print(f"\nstep {step:5d}  loss {loss.item():.4f}")
             acc = evaluate(model, n=10)
             print(f"  exact-match acc = {acc:.2f}")
+
+    final_demo(model)
 
 
 if __name__ == "__main__":
