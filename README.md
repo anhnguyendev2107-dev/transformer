@@ -83,10 +83,21 @@ graph TD
 cd Transformer
 source .venv/bin/activate   # hoặc venv của bạn
 pip install -r requirements.txt
-python train_copy_task.py
+
+python example_meaningful_sentences.py   # copy task với câu tiếng Việt
+python train_reverse_task.py             # đảo ngược chuỗi
+python train_sort_task.py                # sắp xếp tăng dần
 ```
 
-Script học **copy sequence** (encoder đọc chuỗi, decoder sinh lại); loss giảm là dấu hiệu pipeline đúng. Chỉnh `STEPS` / `LR` trong file nếu muốn hội tụ chặt hơn.
+Các script là **synthetic seq2seq task** để verify pipeline Transformer:
+
+| Task | Khó hơn copy ở chỗ | Tín hiệu pipeline đúng |
+|---|---|---|
+| **Copy** (`example_meaningful_sentences.py`) | — (baseline) | Loss giảm, model "nhớ" lại câu trong corpus |
+| **Reverse** (`train_reverse_task.py`) | Cross-attention phải attend ngược (vị trí cuối → đầu) | exact-match accuracy → ~1.0 |
+| **Sort** (`train_sort_task.py`) | Không có alignment cố định src↔tgt; mỗi bước decoder phải "chọn" min chưa sinh | exact-match accuracy → ~1.0 (cần nhiều step hơn) |
+
+Chỉnh `STEPS` / `LR` / `MAX_LEN` trong từng file để thử.
 
 ```bash
 python -m pytest tests/test_shapes.py -q
