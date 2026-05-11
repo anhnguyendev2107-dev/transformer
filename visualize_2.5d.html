@@ -532,7 +532,6 @@
       </svg>
       <div class="diagram-inner" id="diagram-inner"></div>
     </div>
-    <div class="hint">Hover vào block để xem mô tả · ⌘/Ctrl + scroll để zoom · đổi params bên trái để rebuild</div>
   </div>
 
 </div>
@@ -1029,26 +1028,33 @@ function buildDiagram() {
 // ============================================================================
 function drawArrows() {
   const svg = document.getElementById('arrows');
-  // clear existing dynamic content (keep <defs>)
   Array.from(svg.querySelectorAll('path, line')).forEach(n => n.remove());
 
   const diagram = document.getElementById('diagram');
-  const dRect = diagram.getBoundingClientRect();
-  svg.setAttribute('width', dRect.width);
-  svg.setAttribute('height', dRect.height);
-  svg.setAttribute('viewBox', `0 0 ${dRect.width} ${dRect.height}`);
+  // Use OFFSET dimensions (pre-transform). SVG lives inside the transformed
+  // diagram, so its content needs to be authored in pre-transform coords.
+  const W = diagram.offsetWidth;
+  const H = diagram.offsetHeight;
+  svg.setAttribute('width', W);
+  svg.setAttribute('height', H);
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
 
-  function center(el) {
-    const r = el.getBoundingClientRect();
+  // Walk offsetParent chain to get pre-transform position relative to diagram.
+  function pos(el) {
+    let x = 0, y = 0;
+    let cur = el;
+    while (cur && cur !== diagram) {
+      x += cur.offsetLeft;
+      y += cur.offsetTop;
+      cur = cur.offsetParent;
+    }
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
     return {
-      x: r.left - dRect.left + r.width / 2,
-      y: r.top - dRect.top + r.height / 2,
-      top: r.top - dRect.top,
-      bottom: r.bottom - dRect.top,
-      left: r.left - dRect.left,
-      right: r.right - dRect.left,
-      w: r.width,
-      h: r.height,
+      x: x + w / 2, y: y + h / 2,
+      top: y, bottom: y + h,
+      left: x, right: x + w,
+      w, h,
     };
   }
 
@@ -1062,71 +1068,59 @@ function drawArrows() {
     svg.appendChild(p);
   }
 
-  // For each column, draw vertical flow lines connecting consecutive blocks.
-  // For each layer, draw residual loops around MHA / FFN / etc.
-
+  // --- Column flow (bottom → top vertical arrows between consecutive boxes) ---
   function drawColumnFlow(col) {
-    // Find all boxes (skip layer-group wrapper — children are also boxes within)
-    const allBoxes = Array.from(col.querySelectorAll('.box, .pe'));
-    // Sort by top position descending → bottom-up flow
-    allBoxes.sort((a, b) => b.getBoundingClientRect().top - a.getBoundingClientRect().top);
-    for (let i = 0; i < allBoxes.length - 1; i++) {
-      const from = center(allBoxes[i]);
-      const to = center(allBoxes[i + 1]);
-      // Vertical arrow upward (since we sorted bottom-first)
+    const items = Array.from(col.querySelectorAll('.box, .pe'));
+    const placed = items.map(el => ({ el, p: pos(el) }));
+    placed.sort((a, b) => b.p.top - a.p.top);  // bottom-most first
+    for (let i = 0; i < placed.length - 1; i++) {
+      const from = placed[i].p;
+      const to = placed[i + 1].p;
+      // arrow from top of bottom-box → just above the bottom of upper-box
       arrow(`M ${from.x} ${from.top} L ${to.x} ${to.bottom + 2}`, 'flow');
     }
   }
-
   if (state.show_flow !== false) {
     document.querySelectorAll('.col').forEach(c => drawColumnFlow(c));
   }
 
-  // Residual connections — curved around each sub-block + its Add&Norm
+  // --- Residual loops around each sub-layer ---
   if (state.show_residual) {
     document.querySelectorAll('.layer-group').forEach(grp => {
       const isEnc = grp.classList.contains('enc-group');
       const numLayers = isEnc ? state.enc_layers : state.dec_layers;
+      const subs = isEnc
+        ? [['mha', 'an1'], ['ffn', 'an2']]
+        : [['mha-masked', 'an1'], ['mha-cross', 'an2'], ['ffn', 'an3']];
       for (let l = 1; l <= numLayers; l++) {
-        // For each sublayer, draw arrow from BEFORE sublayer to its Add&Norm
-        const subs = isEnc
-          ? [['mha', 'an1'], ['ffn', 'an2']]
-          : [['mha-masked', 'an1'], ['mha-cross', 'an2'], ['ffn', 'an3']];
-        // The "before" point for the first sublayer of a layer is the bottom of:
-        //   - PE block if layer 1
-        //   - previous layer's last Add&Norm otherwise
-        // We'll just take the bottom of the sublayer's input box.
-        subs.forEach(([role, anRole], idx) => {
+        subs.forEach(([role, anRole]) => {
           const sub = grp.querySelector(`[data-role="${role}"][data-layer="${l}"]`);
           const an = grp.querySelector(`[data-role="${anRole}"][data-layer="${l}"]`);
           if (!sub || !an) return;
-          const subC = center(sub);
-          const anC = center(an);
-          // Residual goes from "input of sublayer" (which is below sub) curved up to add&norm
-          const startX = subC.left - 8;
-          const startY = subC.bottom;
-          const endX = anC.left - 8;
-          const endY = anC.y;
-          const cx = startX - 40;
+          const sp = pos(sub);
+          const ap = pos(an);
+          // Bottom-left of sub → curve left → middle-left of add&norm (which is above sub).
+          const startX = sp.left - 8;
+          const startY = sp.bottom;
+          const endX = ap.left - 8;
+          const endY = ap.y;
+          const cx = startX - 36;
           arrow(`M ${startX} ${startY} C ${cx} ${startY}, ${cx} ${endY}, ${endX} ${endY}`, '');
         });
       }
     });
   }
 
-  // Cross-attention arrows: from top of encoder group to cross-attn of each decoder layer
+  // --- Cross-attention arrows: top of encoder group → each decoder cross-attn ---
   if (state.show_cross) {
     const encGroup = document.querySelector('.enc-group');
     if (encGroup) {
-      const encTopRect = encGroup.getBoundingClientRect();
-      const encTopX = encTopRect.right - dRect.left - 20;
-      const encTopY = encTopRect.top - dRect.top + 30;
-      // Vertical line up from top of encoder group, then branch right to each cross-attn
-      const decCrossList = document.querySelectorAll('.dec-group [data-role="mha-cross"]');
-      decCrossList.forEach(cross => {
-        const c = center(cross);
-        // Curve from (encTopX, encTopY) over to (c.left, c.y) — left side of cross box
-        arrow(`M ${encTopX} ${encTopY} C ${encTopX + 80} ${encTopY}, ${c.left - 80} ${c.y}, ${c.left - 2} ${c.y}`, 'cross');
+      const eg = pos(encGroup);
+      const encTopX = eg.right - 20;
+      const encTopY = eg.top + 24;
+      document.querySelectorAll('.dec-group [data-role="mha-cross"]').forEach(cross => {
+        const c = pos(cross);
+        arrow(`M ${encTopX} ${encTopY} C ${encTopX + 90} ${encTopY}, ${c.left - 90} ${c.y}, ${c.left - 2} ${c.y}`, 'cross');
       });
     }
   }
