@@ -59,9 +59,28 @@
     min-height: 100%;
     min-width: 760px;
     transform-origin: top center;
-    transform: perspective(2400px) rotateX(2deg) rotateY(-3deg) scale(1);
-    transition: transform 0.06s linear;
+    transform: perspective(1800px) rotateX(8deg) rotateY(-9deg) scale(1);
+    transform-style: preserve-3d;
+    transition: transform 0.08s linear;
   }
+  /* tilted floor grid for depth */
+  .diagram::before {
+    content: '';
+    position: absolute;
+    inset: -200px -200px -200px -200px;
+    background-image:
+      linear-gradient(rgba(88,166,255,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(88,166,255,0.06) 1px, transparent 1px);
+    background-size: 60px 60px;
+    transform: translateZ(-100px) rotateX(-20deg);
+    pointer-events: none;
+    z-index: -1;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  }
+  .diagram-inner { transform-style: preserve-3d; }
+  .col { transform-style: preserve-3d; }
+  .layer-group { transform-style: preserve-3d; transform: translateZ(15px); }
   .zoom-bar {
     position: absolute;
     right: 20px;
@@ -112,16 +131,36 @@
     text-align: center;
     color: #1f2937;
     border: 1.5px solid #1f2937;
+    /* Extruded "thick card" effect: stacked solid shadows + ambient drop */
     box-shadow:
-      0 2px 0 rgba(0, 0, 0, 0.25),
-      0 4px 12px rgba(0, 0, 0, 0.35);
+      2px 2px 0 rgba(0, 0, 0, 0.22),
+      4px 4px 0 rgba(0, 0, 0, 0.20),
+      6px 6px 0 rgba(0, 0, 0, 0.18),
+      8px 10px 24px rgba(0, 0, 0, 0.55);
     cursor: pointer;
     transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
     min-width: 210px;
-    background-image: linear-gradient(180deg, rgba(255,255,255,0.45), rgba(0,0,0,0.05));
+    background-image: linear-gradient(160deg, rgba(255,255,255,0.55), rgba(0,0,0,0.10));
+    transform: translateZ(30px);
+    transform-style: preserve-3d;
   }
-  .box:hover { transform: translateY(-2px); filter: brightness(1.08); }
-  .box.focused { box-shadow: 0 0 0 3px #58a6ff, 0 4px 12px rgba(88,166,255,0.5); }
+  .box:hover {
+    transform: translateZ(50px) translateY(-2px);
+    filter: brightness(1.1);
+    box-shadow:
+      3px 3px 0 rgba(0, 0, 0, 0.22),
+      6px 6px 0 rgba(0, 0, 0, 0.20),
+      9px 9px 0 rgba(0, 0, 0, 0.18),
+      14px 16px 32px rgba(0, 0, 0, 0.55);
+  }
+  .box.focused {
+    box-shadow:
+      0 0 0 3px #58a6ff,
+      2px 2px 0 rgba(0, 0, 0, 0.22),
+      4px 4px 0 rgba(0, 0, 0, 0.20),
+      6px 6px 0 rgba(0, 0, 0, 0.18),
+      8px 10px 24px rgba(88, 166, 255, 0.5);
+  }
   .box-title {
     font-size: 11px;
     font-weight: 700;
@@ -239,11 +278,12 @@
     box-shadow: inset 0 -2px 0 rgba(0,0,0,0.18);
   }
 
-  /* layer-group wrapper */
+  /* layer-group wrapper — column-reverse so layer 1 (appended first) sits at the
+     bottom of the stack, matching the paper's bottom-up data flow. */
   .layer-group {
     position: relative;
     display: flex;
-    flex-direction: column;
+    flex-direction: column-reverse;
     align-items: center;
     gap: 8px;
     padding: 14px 20px;
@@ -523,10 +563,9 @@ const state = {
 
 function applyZoom() {
   const d = document.getElementById('diagram');
-  const tilt = state.tilt_3d ? 'perspective(2400px) rotateX(2deg) rotateY(-3deg) ' : '';
+  const tilt = state.tilt_3d ? 'perspective(1800px) rotateX(8deg) rotateY(-9deg) ' : '';
   d.style.transform = `${tilt}scale(${state.zoom})`;
   document.getElementById('zoom-val').textContent = Math.round(state.zoom * 100) + '%';
-  // Arrows need redraw because getBoundingClientRect reflects post-transform.
   requestAnimationFrame(drawArrows);
 }
 function setZoom(z) {
@@ -862,7 +901,6 @@ function buildEncoderColumn() {
   tokensRow.style.boxShadow = 'none';
   col.appendChild(tokensRow);
 
-  reverseColumn(col);
   return col;
 }
 
@@ -966,7 +1004,6 @@ function buildDecoderColumn() {
   tokensRow.style.boxShadow = 'none';
   col.appendChild(tokensRow);
 
-  reverseColumn(col);
   return col;
 }
 
