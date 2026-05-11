@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Transformer — Reverse Task Visualization</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0d1117;
+    color: #c9d1d9;
+    line-height: 1.6;
+  }
+  header {
+    padding: 30px 40px 20px;
+    border-bottom: 1px solid #30363d;
+    background: linear-gradient(180deg, #161b22, #0d1117);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  h1 { margin: 0 0 6px; font-size: 22px; color: #58a6ff; }
+  header .sub { font-size: 13px; color: #8b949e; }
+  .progress-bar {
+    margin-top: 12px;
+    height: 4px;
+    background: #21262d;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-bar > div {
+    height: 100%;
+    background: linear-gradient(90deg, #58a6ff, #a371f7);
+    width: 0%;
+    transition: width 0.3s;
+  }
+  main { max-width: 1200px; margin: 0 auto; padding: 40px; }
+  .step {
+    margin-bottom: 80px;
+    padding: 24px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.5s, transform 0.5s;
+  }
+  .step.visible { opacity: 1; transform: translateY(0); }
+  .step h2 {
+    color: #f0883e;
+    margin: 0 0 8px;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .step h2 .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: #1f6feb;
+    color: white;
+    border-radius: 50%;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .step .shape {
+    display: inline-block;
+    margin-left: 10px;
+    padding: 2px 8px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    color: #7ee787;
+  }
+  .step p { margin: 8px 0; color: #c9d1d9; font-size: 14px; }
+  .step .note {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: #0d1117;
+    border-left: 3px solid #58a6ff;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #8b949e;
+  }
+  .viz {
+    margin: 20px 0;
+    padding: 24px;
+    background: #0d1117;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    overflow-x: auto;
+  }
+
+  /* Token boxes */
+  .tokens { display: flex; gap: 8px; align-items: center; }
+  .token {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 20px;
+    color: white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    position: relative;
+  }
+  .token .label {
+    position: absolute;
+    bottom: -22px;
+    font-size: 10px;
+    color: #8b949e;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+  .t3  { background: #d29922; }
+  .t4  { background: #db61a2; }
+  .t5  { background: #58a6ff; }
+  .t6  { background: #56d364; }
+  .t7  { background: #f0883e; }
+  .t-sos { background: #6e7681; color: #e6edf3; font-size: 14px; }
+  .t-eos { background: #6e7681; color: #e6edf3; font-size: 14px; }
+  .t-pad { background: #21262d; color: #6e7681; font-size: 14px; }
+
+  /* Arrow */
+  .arrow {
+    color: #58a6ff;
+    font-size: 32px;
+    margin: 8px 0;
+  }
+  .arrow-down { font-size: 28px; }
+
+  /* Embedding grid: each token -> vector visualized as small color cells */
+  .embed-row { display: flex; gap: 24px; }
+  .embed-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .embed-vec {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 1px;
+    width: 80px;
+  }
+  .embed-vec div {
+    aspect-ratio: 1;
+    border-radius: 1px;
+  }
+
+  /* Attention matrix */
+  .attn-grid {
+    display: grid;
+    gap: 2px;
+    padding: 12px;
+    background: #161b22;
+    border-radius: 4px;
+  }
+  .attn-cell {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: white;
+    font-family: monospace;
+    border-radius: 2px;
+  }
+  .attn-axis {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: #8b949e;
+  }
+  .attn-wrap {
+    display: grid;
+    grid-template-columns: auto auto;
+    grid-template-rows: auto auto;
+    gap: 4px;
+    align-items: center;
+  }
+
+  /* Multi-head visualization */
+  .heads {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+  .head {
+    padding: 10px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    text-align: center;
+  }
+  .head-title {
+    font-size: 11px;
+    color: #8b949e;
+    margin-bottom: 6px;
+  }
+  .head-bars {
+    display: flex;
+    gap: 2px;
+    height: 30px;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .head-bar {
+    width: 6px;
+    background: #58a6ff;
+    border-radius: 1px;
+  }
+
+  /* FFN visualization */
+  .ffn { display: flex; align-items: center; gap: 12px; }
+  .ffn-dim {
+    padding: 8px 14px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    font-family: monospace;
+    color: #7ee787;
+  }
+  .ffn-dim.wide { background: #1f2937; border-color: #58a6ff; }
+  .ffn-op { color: #8b949e; font-size: 12px; }
+
+  /* Architecture overview */
+  .arch {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 20px;
+    width: 100%;
+    align-items: center;
+  }
+  .arch-block {
+    padding: 16px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    text-align: center;
+  }
+  .arch-block h3 { margin: 0 0 8px; color: #58a6ff; font-size: 14px; }
+  .arch-block .sub { font-size: 11px; color: #8b949e; }
+  .arch-block .layer {
+    margin: 6px 0;
+    padding: 6px;
+    background: #0d1117;
+    border-radius: 3px;
+    font-size: 12px;
+    color: #c9d1d9;
+  }
+  .arch-arrow { color: #58a6ff; font-size: 24px; }
+
+  /* Vocab distribution */
+  .vocab-dist {
+    display: flex;
+    gap: 4px;
+    align-items: flex-end;
+    height: 80px;
+    padding: 12px;
+    background: #161b22;
+    border-radius: 4px;
+  }
+  .vocab-bar {
+    width: 24px;
+    background: #58a6ff;
+    border-radius: 2px 2px 0 0;
+    position: relative;
+    transition: height 0.5s;
+  }
+  .vocab-bar.winner { background: #56d364; box-shadow: 0 0 12px #56d364; }
+  .vocab-bar .vlabel {
+    position: absolute;
+    bottom: -16px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    color: #8b949e;
+  }
+  .vocab-bar .vprob {
+    position: absolute;
+    top: -16px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    color: #c9d1d9;
+    white-space: nowrap;
+  }
+
+  /* Causal mask */
+  .mask {
+    display: grid;
+    gap: 1px;
+    padding: 8px;
+    background: #161b22;
+    border-radius: 4px;
+  }
+  .mask-cell {
+    width: 24px;
+    height: 24px;
+    border-radius: 1px;
+  }
+  .mask-cell.visible { background: #58a6ff; }
+  .mask-cell.hidden { background: #21262d; }
+
+  code {
+    background: #161b22;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 13px;
+    color: #f0883e;
+  }
+  .legend {
+    display: flex;
+    gap: 16px;
+    font-size: 11px;
+    color: #8b949e;
+    align-items: center;
+  }
+  .legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+
+  footer {
+    text-align: center;
+    padding: 30px;
+    color: #6e7681;
+    font-size: 12px;
+    border-top: 1px solid #30363d;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Transformer — Reverse Task Forward Pass</h1>
+  <div class="sub">
+    Input <code>[3, 4, 5, 6]</code> → Output <code>[6, 5, 4, 3]</code> &nbsp;|&nbsp;
+    <code>d_model=128, num_heads=8, enc_layers=dec_layers=2</code>
+  </div>
+  <div class="progress-bar"><div id="progress"></div></div>
+</header>
+
+<main>
+
+<!-- STEP 0: Overview -->
+<section class="step">
+  <h2><span class="num">0</span> Tổng quan kiến trúc</h2>
+  <p>Encoder đọc src thành <em>memory</em>. Decoder sinh từng token một, mỗi bước nhìn <em>memory</em> (cross-attention) và các token đã sinh (self-attention causal).</p>
+  <div class="viz">
+    <div class="arch">
+      <div class="arch-block">
+        <h3>Encoder</h3>
+        <div class="sub">đọc src → memory</div>
+        <div class="layer">EncoderLayer × 2</div>
+        <div class="sub">self-attention + FFN</div>
+      </div>
+      <div class="arch-arrow">→ memory →</div>
+      <div class="arch-block">
+        <h3>Decoder</h3>
+        <div class="sub">sinh tgt autoregressive</div>
+        <div class="layer">DecoderLayer × 2</div>
+        <div class="sub">masked-self-attn + cross-attn + FFN</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STEP 1: Input tokens -->
+<section class="step">
+  <h2><span class="num">1</span> Input tokens <span class="shape">src: (1, 4)</span></h2>
+  <p>Batch size = 1 (cho ví dụ), 4 token IDs. Token 3..14 là token "thực"; 0=<code>&lt;pad&gt;</code>, 1=<code>&lt;sos&gt;</code>, 2=<code>&lt;eos&gt;</code>.</p>
+  <div class="viz">
+    <div class="tokens">
+      <div class="token t3">3<span class="label">pos 0</span></div>
+      <div class="token t4">4<span class="label">pos 1</span></div>
+      <div class="token t5">5<span class="label">pos 2</span></div>
+      <div class="token t6">6<span class="label">pos 3</span></div>
+    </div>
+  </div>
+  <div class="note">Hiện tại token chỉ là số nguyên — model chưa thấy mối quan hệ nào giữa chúng.</div>
+</section>
+
+<!-- STEP 2: Embedding -->
+<section class="step">
+  <h2><span class="num">2</span> Embedding lookup <span class="shape">(1, 4) → (1, 4, 128)</span></h2>
+  <p>Mỗi token ID lookup ra vector 128 chiều (học được). Nhân thêm <code>√d_model = √128 ≈ 11.3</code> theo paper.</p>
+  <div class="viz">
+    <div class="embed-row" id="embed-row"></div>
+  </div>
+  <div class="note">Embedding ngẫu nhiên ban đầu, sẽ học qua training. Mỗi ô màu = 1 chiều của vector 128-d.</div>
+</section>
+
+<!-- STEP 3: Positional encoding -->
+<section class="step">
+  <h2><span class="num">3</span> + Positional Encoding <span class="shape">(1, 4, 128)</span></h2>
+  <p>Cộng vào embedding một tensor sin/cos cố định theo vị trí. Cho phép model phân biệt token ở pos 0 vs pos 3 (vì self-attention bản chất là permutation-invariant).</p>
+  <div class="viz">
+    <svg width="600" height="120" viewBox="0 0 600 120">
+      <defs>
+        <linearGradient id="grid" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#21262d" stop-opacity="0.5"/>
+          <stop offset="100%" stop-color="#21262d" stop-opacity="0.1"/>
+        </linearGradient>
+      </defs>
+      <line x1="0" y1="60" x2="600" y2="60" stroke="#30363d" stroke-width="1"/>
+      <path id="wave-sin" d="" fill="none" stroke="#58a6ff" stroke-width="2"/>
+      <path id="wave-cos" d="" fill="none" stroke="#f0883e" stroke-width="2"/>
+      <text x="10" y="20" fill="#58a6ff" font-size="11">sin(pos / 10000^(2i/d))</text>
+      <text x="10" y="36" fill="#f0883e" font-size="11">cos(pos / 10000^(2i/d))</text>
+    </svg>
+  </div>
+  <div class="note">Tensor sau cộng vẫn shape (1, 4, 128) — vào encoder layer tiếp theo.</div>
+</section>
+
+<!-- STEP 4: Encoder Self-Attention -->
+<section class="step">
+  <h2><span class="num">4</span> Encoder Layer 1: Multi-Head Self-Attention <span class="shape">(1, 4, 128)</span></h2>
+  <p>Mỗi token "nhìn" tất cả token khác trong src và tính tổng có trọng số. 8 head song song, mỗi head 16-d.</p>
+  <div class="viz">
+    <div class="heads">
+      <div class="head">
+        <div class="head-title">Head 1</div>
+        <div class="head-bars" id="h1"></div>
+      </div>
+      <div class="head">
+        <div class="head-title">Head 2</div>
+        <div class="head-bars" id="h2"></div>
+      </div>
+      <div class="head">
+        <div class="head-title">Head 3</div>
+        <div class="head-bars" id="h3"></div>
+      </div>
+      <div class="head">
+        <div class="head-title">Head 4</div>
+        <div class="head-bars" id="h4"></div>
+      </div>
+    </div>
+    <div style="margin-top:20px;">
+      <div style="font-size:12px;color:#8b949e;margin-bottom:8px;text-align:center;">
+        Attention weights (Head 1) — hàng = query token, cột = key token
+      </div>
+      <div class="attn-wrap">
+        <div></div>
+        <div style="display:flex;gap:2px;justify-content:center;">
+          <div class="attn-axis" style="width:36px">k₀</div>
+          <div class="attn-axis" style="width:36px">k₁</div>
+          <div class="attn-axis" style="width:36px">k₂</div>
+          <div class="attn-axis" style="width:36px">k₃</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px;">
+          <div class="attn-axis" style="height:36px">q₀</div>
+          <div class="attn-axis" style="height:36px">q₁</div>
+          <div class="attn-axis" style="height:36px">q₂</div>
+          <div class="attn-axis" style="height:36px">q₃</div>
+        </div>
+        <div class="attn-grid" id="attn-enc" style="grid-template-columns:repeat(4,1fr);"></div>
+      </div>
+    </div>
+  </div>
+  <div class="note">Score = <code>softmax(QKᵀ/√d_k)</code>. Ô càng sáng = trọng số càng cao. Q/K/V đều xuất phát từ <em>cùng</em> input (self-attention).</div>
+</section>
+
+<!-- STEP 5: Encoder FFN -->
+<section class="step">
+  <h2><span class="num">5</span> Encoder Layer 1: Feed-Forward <span class="shape">(1, 4, 128)</span></h2>
+  <p>Mở rộng từ 128 lên 512, ReLU, rồi chiếu về 128. <strong>Áp dụng độc lập từng vị trí</strong> — không trộn giữa các token nữa.</p>
+  <div class="viz">
+    <div class="ffn">
+      <div class="ffn-dim">128</div>
+      <div class="ffn-op">Linear → ReLU →</div>
+      <div class="ffn-dim wide">512</div>
+      <div class="ffn-op">Linear →</div>
+      <div class="ffn-dim">128</div>
+    </div>
+  </div>
+  <div class="note">Self-Attention trộn thông tin <em>giữa</em> các token. FFN biến đổi <em>từng</em> token. Hai bước này lặp lại trong mỗi layer.</div>
+</section>
+
+<!-- STEP 6: Layer 2 -->
+<section class="step">
+  <h2><span class="num">6</span> Encoder Layer 2 (lặp lại) <span class="shape">(1, 4, 128)</span></h2>
+  <p>Output của layer 1 → input của layer 2. Cùng cấu trúc (self-attention + FFN) nhưng <strong>trọng số khác</strong>. Cho phép composition: layer 1 học pattern đơn giản, layer 2 học pattern phức tạp hơn.</p>
+  <div class="viz">
+    <div class="arch" style="grid-template-columns:1fr auto 1fr auto 1fr;">
+      <div class="arch-block">
+        <div class="sub">Input</div>
+        <div class="layer">(1, 4, 128)</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-block">
+        <h3 style="font-size:12px;">EncoderLayer 1</h3>
+        <div class="layer">self-attn + FFN</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-block">
+        <h3 style="font-size:12px;">EncoderLayer 2</h3>
+        <div class="layer">self-attn + FFN</div>
+      </div>
+    </div>
+    <div style="margin-top:8px;color:#7ee787;font-size:13px;">
+      Output cuối → <strong>memory</strong> (đưa cho decoder)
+    </div>
+  </div>
+</section>
+
+<!-- STEP 7: Decoder begins -->
+<section class="step">
+  <h2><span class="num">7</span> Decoder bắt đầu — bước 1: chỉ có <code>&lt;sos&gt;</code> <span class="shape">tgt: (1, 1)</span></h2>
+  <p>Decoder sinh autoregressive. Bước đầu chỉ có 1 token: <code>&lt;sos&gt;</code> (start of sequence).</p>
+  <div class="viz">
+    <div class="tokens">
+      <div class="token t-sos">SOS<span class="label">pos 0</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- STEP 8: Masked Self-Attention -->
+<section class="step">
+  <h2><span class="num">8</span> Decoder Masked Self-Attention <span class="shape">(1, 1, 128) → (1, 1, 128)</span></h2>
+  <p>Decoder cũng có self-attention nhưng <strong>causal mask</strong>: token tại pos <em>i</em> chỉ được attend đến pos <em>≤ i</em>. Ngăn "nhìn trộm" tương lai khi train.</p>
+  <div class="viz">
+    <div style="display:flex;gap:40px;align-items:center;">
+      <div>
+        <div style="font-size:12px;color:#8b949e;margin-bottom:8px;text-align:center;">
+          Causal mask khi tgt có 4 token<br><span style="color:#58a6ff">sáng</span> = nhìn được, <span style="color:#6e7681">tối</span> = bị mask
+        </div>
+        <div class="mask" id="causal-mask" style="grid-template-columns:repeat(4,1fr);"></div>
+      </div>
+      <div style="max-width:300px;font-size:13px;color:#8b949e;">
+        Khi sinh token thứ 2, decoder mới thấy <code>&lt;sos&gt;</code>.<br>
+        Khi sinh token thứ 3, decoder thấy <code>&lt;sos&gt;</code> + token vừa sinh.<br>
+        Cứ thế tiếp.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STEP 9: Cross-Attention -->
+<section class="step">
+  <h2><span class="num">9</span> Decoder Cross-Attention <span class="shape">Q ← decoder, K,V ← memory</span></h2>
+  <p>Đây là chỗ decoder "đọc" lại src. Q từ decoder hidden state, K và V từ <em>memory</em> (output encoder). Cho phép mỗi token tgt attend đến bất kỳ token src nào.</p>
+  <div class="viz">
+    <div style="font-size:12px;color:#8b949e;margin-bottom:8px;text-align:center;">
+      Cross-attention weights (Head 1, sinh token thứ 1) — hàng tgt × cột src
+    </div>
+    <div class="attn-wrap">
+      <div></div>
+      <div style="display:flex;gap:2px;justify-content:center;">
+        <div class="attn-axis" style="width:40px">src 0<br>(3)</div>
+        <div class="attn-axis" style="width:40px">src 1<br>(4)</div>
+        <div class="attn-axis" style="width:40px">src 2<br>(5)</div>
+        <div class="attn-axis" style="width:40px">src 3<br>(6)</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px;">
+        <div class="attn-axis" style="height:40px">tgt 0<br>(SOS)</div>
+      </div>
+      <div class="attn-grid" id="attn-cross" style="grid-template-columns:repeat(4,40px);"></div>
+    </div>
+    <div style="margin-top:20px;font-size:13px;color:#7ee787;text-align:center;">
+      ⬆ Cho reverse task: ở bước đầu, model attend mạnh nhất vào <strong>src cuối (pos 3 = "6")</strong> vì nó cần sinh ra "6"!
+    </div>
+  </div>
+  <div class="note">Đây chính là cơ chế "đảo ngược" mà model học: cross-attention học mapping <code>pos_tgt = L - 1 - pos_src</code>.</div>
+</section>
+
+<!-- STEP 10: Output linear + softmax -->
+<section class="step">
+  <h2><span class="num">10</span> Linear → Softmax → token đầu tiên <span class="shape">(1, 1, 128) → (1, 1, 15)</span></h2>
+  <p>Lớp linear cuối chiếu 128 → vocab_size (15). Softmax cho xác suất. Argmax → token tiếp theo.</p>
+  <div class="viz">
+    <div style="font-size:12px;color:#8b949e;margin-bottom:8px;">Probability distribution trên 15 vocab</div>
+    <div class="vocab-dist" id="vocab-dist"></div>
+    <div style="margin-top:30px;font-size:14px;color:#56d364;">
+      argmax → <strong>token 6</strong> ✓ (đúng kỳ vọng vì cần đảo ngược của <code>[3,4,5,6]</code>)
+    </div>
+  </div>
+</section>
+
+<!-- STEP 11: Autoregressive -->
+<section class="step">
+  <h2><span class="num">11</span> Lặp lại: append + sinh tiếp</h2>
+  <p>Token vừa sinh được append vào tgt. Decoder chạy lại với tgt mới. Cứ thế tới khi gặp <code>&lt;eos&gt;</code>.</p>
+  <div class="viz">
+    <div style="display:flex;flex-direction:column;gap:24px;align-items:flex-start;">
+      <div>
+        <div style="font-size:11px;color:#8b949e;margin-bottom:6px;">Bước 1: tgt = [SOS]</div>
+        <div class="tokens">
+          <div class="token t-sos">SOS</div>
+          <div class="arrow" style="margin:0 4px;font-size:20px;">→</div>
+          <div class="token t6">6</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#8b949e;margin-bottom:6px;">Bước 2: tgt = [SOS, 6]</div>
+        <div class="tokens">
+          <div class="token t-sos">SOS</div>
+          <div class="token t6">6</div>
+          <div class="arrow" style="margin:0 4px;font-size:20px;">→</div>
+          <div class="token t5">5</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#8b949e;margin-bottom:6px;">Bước 3: tgt = [SOS, 6, 5]</div>
+        <div class="tokens">
+          <div class="token t-sos">SOS</div>
+          <div class="token t6">6</div>
+          <div class="token t5">5</div>
+          <div class="arrow" style="margin:0 4px;font-size:20px;">→</div>
+          <div class="token t4">4</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#8b949e;margin-bottom:6px;">Bước 4: tgt = [SOS, 6, 5, 4]</div>
+        <div class="tokens">
+          <div class="token t-sos">SOS</div>
+          <div class="token t6">6</div>
+          <div class="token t5">5</div>
+          <div class="token t4">4</div>
+          <div class="arrow" style="margin:0 4px;font-size:20px;">→</div>
+          <div class="token t3">3</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#8b949e;margin-bottom:6px;">Bước 5: tgt = [SOS, 6, 5, 4, 3] → model sinh EOS, dừng</div>
+        <div class="tokens">
+          <div class="token t-sos">SOS</div>
+          <div class="token t6">6</div>
+          <div class="token t5">5</div>
+          <div class="token t4">4</div>
+          <div class="token t3">3</div>
+          <div class="arrow" style="margin:0 4px;font-size:20px;">→</div>
+          <div class="token t-eos">EOS</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="note">Output cuối (bỏ SOS/EOS): <code>[6, 5, 4, 3]</code> — đảo ngược của <code>[3, 4, 5, 6]</code> ✓</div>
+</section>
+
+<!-- STEP 12: Recap -->
+<section class="step">
+  <h2><span class="num">12</span> Tóm tắt</h2>
+  <div class="viz" style="align-items:flex-start;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;width:100%;">
+      <div>
+        <h3 style="color:#58a6ff;font-size:14px;margin-top:0;">Encoder làm gì</h3>
+        <ul style="font-size:13px;color:#c9d1d9;line-height:1.8;">
+          <li>Embed + position</li>
+          <li>Self-attention: token "đọc" token khác trong src</li>
+          <li>FFN: biến đổi từng vị trí</li>
+          <li>Lặp lại × N layer → memory</li>
+        </ul>
+      </div>
+      <div>
+        <h3 style="color:#f0883e;font-size:14px;margin-top:0;">Decoder làm gì</h3>
+        <ul style="font-size:13px;color:#c9d1d9;line-height:1.8;">
+          <li>Masked self-attention: nhìn token đã sinh</li>
+          <li><strong>Cross-attention: nhìn memory (chỗ học reverse)</strong></li>
+          <li>FFN</li>
+          <li>Lặp × N layer, rồi Linear → vocab</li>
+          <li>Argmax, append, lặp đến EOS</li>
+        </ul>
+      </div>
+    </div>
+    <div class="legend" style="margin-top:16px;">
+      <span><span class="legend-dot" style="background:#58a6ff"></span>Encoder path</span>
+      <span><span class="legend-dot" style="background:#f0883e"></span>Decoder path</span>
+      <span><span class="legend-dot" style="background:#56d364"></span>Correct prediction</span>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  Transformer reverse task visualization • dựa trên code <code>transformer/</code> và <code>train_reverse_task.py</code>
+</footer>
+
+<script>
+// === Embedding visualization ===
+(function() {
+  const colors = ['#d29922', '#db61a2', '#58a6ff', '#56d364'];
+  const tokens = [3, 4, 5, 6];
+  const row = document.getElementById('embed-row');
+  if (!row) return;
+  tokens.forEach((tok, idx) => {
+    const cell = document.createElement('div');
+    cell.className = 'embed-cell';
+    cell.innerHTML = `
+      <div class="token" style="background:${colors[idx]};">${tok}</div>
+      <div style="color:#8b949e;font-size:11px;">→</div>
+      <div class="embed-vec" id="emb-${idx}"></div>
+      <div style="color:#8b949e;font-size:10px;font-family:monospace;">128-d (8×16)</div>
+    `;
+    row.appendChild(cell);
+  });
+  // Fill embedding grid with pseudo-random shades seeded by token id
+  tokens.forEach((tok, idx) => {
+    const grid = document.getElementById('emb-' + idx);
+    let seed = tok * 31;
+    for (let i = 0; i < 64; i++) {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      const v = (seed % 255);
+      const cell = document.createElement('div');
+      cell.style.background = `rgb(${v},${(v*2)%255},${(v*3)%255})`;
+      grid.appendChild(cell);
+    }
+  });
+})();
+
+// === Positional encoding waves ===
+(function() {
+  const sin = document.getElementById('wave-sin');
+  const cos = document.getElementById('wave-cos');
+  if (!sin) return;
+  let dSin = '', dCos = '';
+  for (let x = 0; x <= 600; x += 4) {
+    const t = x / 60;
+    const ys = 60 - Math.sin(t) * 30;
+    const yc = 60 - Math.cos(t * 0.7) * 30;
+    dSin += (x === 0 ? 'M' : 'L') + x + ',' + ys + ' ';
+    dCos += (x === 0 ? 'M' : 'L') + x + ',' + yc + ' ';
+  }
+  sin.setAttribute('d', dSin);
+  cos.setAttribute('d', dCos);
+})();
+
+// === Multi-head bars ===
+(function() {
+  const heads = [
+    [0.1, 0.2, 0.3, 0.4],   // h1: attend pos cuối nhiều nhất
+    [0.4, 0.3, 0.2, 0.1],   // h2: attend pos đầu
+    [0.25, 0.25, 0.25, 0.25], // h3: phẳng
+    [0.1, 0.4, 0.4, 0.1],   // h4: attend giữa
+  ];
+  heads.forEach((h, idx) => {
+    const bars = document.getElementById('h' + (idx + 1));
+    if (!bars) return;
+    h.forEach(v => {
+      const b = document.createElement('div');
+      b.className = 'head-bar';
+      b.style.height = (v * 100) + '%';
+      bars.appendChild(b);
+    });
+  });
+})();
+
+// === Encoder self-attention grid (4x4) ===
+(function() {
+  const grid = document.getElementById('attn-enc');
+  if (!grid) return;
+  // pseudo attention weights — diagonal-ish + some cross
+  const weights = [
+    [0.5, 0.2, 0.2, 0.1],
+    [0.15, 0.45, 0.25, 0.15],
+    [0.15, 0.25, 0.45, 0.15],
+    [0.1, 0.2, 0.2, 0.5],
+  ];
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
+      const w = weights[i][j];
+      const cell = document.createElement('div');
+      cell.className = 'attn-cell';
+      const intensity = Math.round(w * 255);
+      cell.style.background = `rgba(88, 166, 255, ${0.2 + w})`;
+      cell.textContent = w.toFixed(2);
+      grid.appendChild(cell);
+    }
+  }
+})();
+
+// === Causal mask (4x4) ===
+(function() {
+  const grid = document.getElementById('causal-mask');
+  if (!grid) return;
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
+      const cell = document.createElement('div');
+      cell.className = 'mask-cell ' + (j <= i ? 'visible' : 'hidden');
+      grid.appendChild(cell);
+    }
+  }
+})();
+
+// === Cross-attention grid (1 row × 4 src) for first decoder step ===
+(function() {
+  const grid = document.getElementById('attn-cross');
+  if (!grid) return;
+  const weights = [0.05, 0.10, 0.15, 0.70];   // attend strongly to last src token
+  weights.forEach(w => {
+    const cell = document.createElement('div');
+    cell.className = 'attn-cell';
+    cell.style.width = '40px';
+    cell.style.height = '40px';
+    cell.style.background = `rgba(86, 211, 100, ${0.2 + w})`;
+    cell.textContent = w.toFixed(2);
+    grid.appendChild(cell);
+  });
+})();
+
+// === Vocab distribution (15 tokens, peak at idx 6) ===
+(function() {
+  const dist = document.getElementById('vocab-dist');
+  if (!dist) return;
+  const probs = [];
+  for (let i = 0; i < 15; i++) {
+    // Gaussian-ish peak at 6
+    const d = Math.abs(i - 6);
+    probs.push(Math.exp(-d * d / 1.5));
+  }
+  const sum = probs.reduce((a, b) => a + b, 0);
+  const norm = probs.map(p => p / sum);
+  const max = Math.max(...norm);
+  const labels = ['pad', 'sos', 'eos', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14'];
+  norm.forEach((p, i) => {
+    const bar = document.createElement('div');
+    bar.className = 'vocab-bar' + (i === 6 ? ' winner' : '');
+    bar.style.height = (p / max * 100) + '%';
+    bar.innerHTML = `<div class="vlabel">${labels[i]}</div><div class="vprob">${(p * 100).toFixed(0)}%</div>`;
+    dist.appendChild(bar);
+  });
+})();
+
+// === Scroll reveal + progress bar ===
+(function() {
+  const steps = document.querySelectorAll('.step');
+  const progress = document.getElementById('progress');
+  const update = () => {
+    const scrolled = window.scrollY;
+    const total = document.body.scrollHeight - window.innerHeight;
+    progress.style.width = Math.min(100, (scrolled / total) * 100) + '%';
+    steps.forEach(s => {
+      const rect = s.getBoundingClientRect();
+      if (rect.top < window.innerHeight * 0.85) s.classList.add('visible');
+    });
+  };
+  window.addEventListener('scroll', update);
+  update();
+})();
+</script>
+
+</body>
+</html>
