@@ -279,42 +279,38 @@
     box-shadow: inset 0 -2px 0 rgba(0,0,0,0.18);
   }
 
-  /* layer-group wrapper. Contains a layer-stack (visible front layer
-     + ghost copies pushed back via translateZ for the Nx depth effect)
-     and an absolutely-positioned Nx label. */
+  /* layer-group wrapper. Holds a layer-stack (front layer + N-1 empty
+     background frames receding in depth) and an absolute Nx label. */
   .layer-group {
     position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 14px 30px;
-    border: 1.5px solid #cbd5e1;
-    border-radius: 10px;
-    background: rgba(241, 245, 249, 0.05);
   }
   .layer-stack {
     position: relative;
-    display: grid;
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr;
+    padding: 14px 30px;
     transform-style: preserve-3d;
   }
-  .layer-front, .layer-ghost {
-    grid-column: 1;
-    grid-row: 1;
+  .layer-front {
+    position: relative;
+    z-index: 1;
     display: flex;
     flex-direction: column-reverse;
     align-items: center;
     gap: 10px;
-    transform-style: preserve-3d;
   }
-  .layer-ghost { pointer-events: none; }
-  .layer-ghost .box { cursor: default; }
-  .layer-ghost .box:hover { transform: translateZ(30px); filter: none; box-shadow:
-      2px 2px 0 rgba(0,0,0,0.22),
-      4px 4px 0 rgba(0,0,0,0.20),
-      6px 6px 0 rgba(0,0,0,0.18),
-      8px 10px 24px rgba(0,0,0,0.55); }
+  /* A frame = the rectangle outline + background that surrounds a layer.
+     Drawn once for the front layer and N-1 more times behind it via translateZ. */
+  .layer-frame {
+    position: absolute;
+    inset: 0;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    pointer-events: none;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  }
   .nx-label {
     position: absolute;
     right: -42px;
@@ -881,29 +877,31 @@ function addNormBox(role, layer, ctx) {
 }
 
 function buildLayerStack(numLayers, frontBoxes) {
-  // Visible "front" layer + (numLayers - 1) ghost copies receding into depth.
+  // One visible front layer + (numLayers - 1) empty background frames
+  // pushed back along Z. The frames provide the "this stack repeats Nx times"
+  // visual without cloning all the sub-boxes.
   const stack = document.createElement('div');
   stack.className = 'layer-stack';
 
+  // Deepest ghost frame first (so the front frame sits on top in DOM order)
+  for (let i = numLayers - 1; i >= 1; i--) {
+    const frame = document.createElement('div');
+    frame.className = 'layer-frame';
+    frame.style.transform = `translate3d(${12 * i}px, ${12 * i}px, ${-70 * i}px)`;
+    frame.style.opacity = String(Math.max(0.35, 1 - 0.18 * i));
+    stack.appendChild(frame);
+  }
+  // Front frame (sits at z=0, behind the sub-boxes which have translateZ(30))
+  const frontFrame = document.createElement('div');
+  frontFrame.className = 'layer-frame';
+  stack.appendChild(frontFrame);
+
+  // The actual interactive layer content
   const front = document.createElement('div');
   front.className = 'layer-front';
   frontBoxes.forEach(b => front.appendChild(b));
-
-  // Append ghosts deepest-first so the front ends up last in DOM
-  for (let i = numLayers - 1; i >= 1; i--) {
-    const ghost = front.cloneNode(true);
-    ghost.classList.remove('layer-front');
-    ghost.classList.add('layer-ghost');
-    ghost.querySelectorAll('[data-role]').forEach(el => {
-      el.removeAttribute('data-role');
-      el.removeAttribute('data-layer');
-    });
-    ghost.style.transform = `translate3d(${10 * i}px, ${10 * i}px, ${-80 * i}px)`;
-    ghost.style.opacity = String(Math.max(0.18, 1 - 0.28 * i));
-    ghost.style.filter = `blur(${i * 0.4}px)`;
-    stack.appendChild(ghost);
-  }
   stack.appendChild(front);
+
   return stack;
 }
 
