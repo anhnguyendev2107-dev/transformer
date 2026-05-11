@@ -279,19 +279,42 @@
     box-shadow: inset 0 -2px 0 rgba(0,0,0,0.18);
   }
 
-  /* layer-group wrapper — column-reverse so L1 (appended first) sits at the
-     BOTTOM of the stack, matching the paper's bottom-up data flow. */
+  /* layer-group wrapper. Contains a layer-stack (visible front layer
+     + ghost copies pushed back via translateZ for the Nx depth effect)
+     and an absolutely-positioned Nx label. */
   .layer-group {
     position: relative;
     display: flex;
-    flex-direction: column-reverse;
+    flex-direction: column;
     align-items: center;
-    gap: 10px;
-    padding: 14px 20px;
+    padding: 14px 30px;
     border: 1.5px solid #cbd5e1;
     border-radius: 10px;
     background: rgba(241, 245, 249, 0.05);
   }
+  .layer-stack {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    transform-style: preserve-3d;
+  }
+  .layer-front, .layer-ghost {
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: center;
+    gap: 10px;
+    transform-style: preserve-3d;
+  }
+  .layer-ghost { pointer-events: none; }
+  .layer-ghost .box { cursor: default; }
+  .layer-ghost .box:hover { transform: translateZ(30px); filter: none; box-shadow:
+      2px 2px 0 rgba(0,0,0,0.22),
+      4px 4px 0 rgba(0,0,0,0.20),
+      6px 6px 0 rgba(0,0,0,0.18),
+      8px 10px 24px rgba(0,0,0,0.55); }
   .nx-label {
     position: absolute;
     right: -42px;
@@ -850,13 +873,31 @@ function addNormBox(role, layer, ctx) {
   return b;
 }
 
-function makeSep() {
-  const sep = document.createElement('div');
-  sep.style.width = '64px';
-  sep.style.height = '2px';
-  sep.style.background = 'rgba(255,255,255,0.18)';
-  sep.style.alignSelf = 'center';
-  return sep;
+function buildLayerStack(numLayers, frontBoxes) {
+  // Visible "front" layer + (numLayers - 1) ghost copies receding into depth.
+  const stack = document.createElement('div');
+  stack.className = 'layer-stack';
+
+  const front = document.createElement('div');
+  front.className = 'layer-front';
+  frontBoxes.forEach(b => front.appendChild(b));
+
+  // Append ghosts deepest-first so the front ends up last in DOM
+  for (let i = numLayers - 1; i >= 1; i--) {
+    const ghost = front.cloneNode(true);
+    ghost.classList.remove('layer-front');
+    ghost.classList.add('layer-ghost');
+    ghost.querySelectorAll('[data-role]').forEach(el => {
+      el.removeAttribute('data-role');
+      el.removeAttribute('data-layer');
+    });
+    ghost.style.transform = `translate3d(${10 * i}px, ${10 * i}px, ${-80 * i}px)`;
+    ghost.style.opacity = String(Math.max(0.18, 1 - 0.28 * i));
+    ghost.style.filter = `blur(${i * 0.4}px)`;
+    stack.appendChild(ghost);
+  }
+  stack.appendChild(front);
+  return stack;
 }
 
 function buildEncoderColumn() {
@@ -866,34 +907,29 @@ function buildEncoderColumn() {
   const group = document.createElement('div');
   group.className = 'layer-group enc-group';
 
-  for (let l = 1; l <= state.enc_layers; l++) {
-    if (l > 1) group.appendChild(makeSep());
-    const mha = makeBox({
-      title: `Multi-Head Attention`,
-      body: renderAttnHeads('self-enc'),
-      shape: `(B, L_src, ${state.d_model})`,
-      cls: 'box-attn',
-      type: 'mha-enc',
-      ctx: l,
-    });
-    mha.dataset.role = 'mha'; mha.dataset.layer = l;
-    const an1 = addNormBox('an1', l, `enc L${l} after MHA`);
-    const ffn = makeBox({
-      title: 'Feed Forward',
-      body: renderFFN(),
-      shape: `${state.d_model} → ${state.d_ff} → ${state.d_model}`,
-      cls: 'box-ffn',
-      type: 'ffn',
-      ctx: `enc L${l}`,
-    });
-    ffn.dataset.role = 'ffn'; ffn.dataset.layer = l;
-    const an2 = addNormBox('an2', l, `enc L${l} after FFN`);
+  // Build ONE front layer; ghosts of it represent the remaining Nx-1 copies.
+  const mha = makeBox({
+    title: `Multi-Head Attention`,
+    body: renderAttnHeads('self-enc'),
+    shape: `(B, L_src, ${state.d_model})`,
+    cls: 'box-attn',
+    type: 'mha-enc',
+    ctx: 1,
+  });
+  mha.dataset.role = 'mha'; mha.dataset.layer = 1;
+  const an1 = addNormBox('an1', 1, `enc after MHA`);
+  const ffn = makeBox({
+    title: 'Feed Forward',
+    body: renderFFN(),
+    shape: `${state.d_model} → ${state.d_ff} → ${state.d_model}`,
+    cls: 'box-ffn',
+    type: 'ffn',
+    ctx: `enc`,
+  });
+  ffn.dataset.role = 'ffn'; ffn.dataset.layer = 1;
+  const an2 = addNormBox('an2', 1, `enc after FFN`);
 
-    group.appendChild(mha);
-    group.appendChild(an1);
-    group.appendChild(ffn);
-    group.appendChild(an2);
-  }
+  group.appendChild(buildLayerStack(state.enc_layers, [mha, an1, ffn, an2]));
 
   const nx = document.createElement('div');
   nx.className = 'nx-label';
@@ -933,46 +969,38 @@ function buildDecoderColumn() {
   const group = document.createElement('div');
   group.className = 'layer-group dec-group';
 
-  for (let l = 1; l <= state.dec_layers; l++) {
-    if (l > 1) group.appendChild(makeSep());
-    const mhaM = makeBox({
-      title: 'Masked Multi-Head Attention',
-      body: renderAttnHeads('masked'),
-      shape: `(B, L_tgt, ${state.d_model})`,
-      cls: 'box-attn masked',
-      type: 'mha-masked',
-      ctx: l,
-    });
-    mhaM.dataset.role = 'mha-masked'; mhaM.dataset.layer = l;
-    const an1 = addNormBox('an1', l, `dec L${l} after masked`);
-    const mhaC = makeBox({
-      title: 'Multi-Head Attention',
-      body: renderAttnHeads('cross'),
-      shape: `Q←dec, K,V←enc`,
-      cls: 'box-attn',
-      type: 'mha-cross',
-      ctx: l,
-    });
-    mhaC.dataset.role = 'mha-cross'; mhaC.dataset.layer = l;
-    const an2 = addNormBox('an2', l, `dec L${l} after cross`);
-    const ffn = makeBox({
-      title: 'Feed Forward',
-      body: renderFFN(),
-      shape: `${state.d_model} → ${state.d_ff} → ${state.d_model}`,
-      cls: 'box-ffn',
-      type: 'ffn',
-      ctx: `dec L${l}`,
-    });
-    ffn.dataset.role = 'ffn'; ffn.dataset.layer = l;
-    const an3 = addNormBox('an3', l, `dec L${l} after FFN`);
+  const mhaM = makeBox({
+    title: 'Masked Multi-Head Attention',
+    body: renderAttnHeads('masked'),
+    shape: `(B, L_tgt, ${state.d_model})`,
+    cls: 'box-attn masked',
+    type: 'mha-masked',
+    ctx: 1,
+  });
+  mhaM.dataset.role = 'mha-masked'; mhaM.dataset.layer = 1;
+  const an1 = addNormBox('an1', 1, `dec after masked`);
+  const mhaC = makeBox({
+    title: 'Multi-Head Attention',
+    body: renderAttnHeads('cross'),
+    shape: `Q←dec, K,V←enc`,
+    cls: 'box-attn',
+    type: 'mha-cross',
+    ctx: 1,
+  });
+  mhaC.dataset.role = 'mha-cross'; mhaC.dataset.layer = 1;
+  const an2 = addNormBox('an2', 1, `dec after cross`);
+  const ffn = makeBox({
+    title: 'Feed Forward',
+    body: renderFFN(),
+    shape: `${state.d_model} → ${state.d_ff} → ${state.d_model}`,
+    cls: 'box-ffn',
+    type: 'ffn',
+    ctx: `dec`,
+  });
+  ffn.dataset.role = 'ffn'; ffn.dataset.layer = 1;
+  const an3 = addNormBox('an3', 1, `dec after FFN`);
 
-    group.appendChild(mhaM);
-    group.appendChild(an1);
-    group.appendChild(mhaC);
-    group.appendChild(an2);
-    group.appendChild(ffn);
-    group.appendChild(an3);
-  }
+  group.appendChild(buildLayerStack(state.dec_layers, [mhaM, an1, mhaC, an2, ffn, an3]));
 
   const nx = document.createElement('div');
   nx.className = 'nx-label';
@@ -1092,7 +1120,8 @@ function drawArrows() {
 
   // --- Vertical flow arrows (bottom → top between consecutive boxes) ---
   function drawColumnFlow(col) {
-    const items = Array.from(col.querySelectorAll('.box, .pe'));
+    const items = Array.from(col.querySelectorAll('.box, .pe'))
+      .filter(el => !el.closest('.layer-ghost'));   // ignore ghost copies
     const placed = items.map(el => ({ el, p: pos(el) }));
     placed.sort((a, b) => b.p.top - a.p.top);  // bottom-most first
     for (let i = 0; i < placed.length - 1; i++) {
