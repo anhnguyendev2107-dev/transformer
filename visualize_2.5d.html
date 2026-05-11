@@ -80,12 +80,9 @@
   /* === Boxes (paper style colors) === */
   .box {
     position: relative;
-    padding: 12px 22px;
-    border-radius: 6px;
+    padding: 10px 14px;
+    border-radius: 8px;
     text-align: center;
-    font-size: 13px;
-    font-weight: 600;
-    line-height: 1.25;
     color: #1f2937;
     border: 1.5px solid #1f2937;
     box-shadow:
@@ -93,20 +90,127 @@
       0 4px 12px rgba(0, 0, 0, 0.35);
     cursor: pointer;
     transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
-    min-width: 170px;
-    background-image: linear-gradient(180deg, rgba(255,255,255,0.35), rgba(0,0,0,0.05));
+    min-width: 210px;
+    background-image: linear-gradient(180deg, rgba(255,255,255,0.45), rgba(0,0,0,0.05));
   }
   .box:hover { transform: translateY(-2px); filter: brightness(1.08); }
   .box.focused { box-shadow: 0 0 0 3px #58a6ff, 0 4px 12px rgba(88,166,255,0.5); }
-  .box .small { display: block; font-size: 10px; font-weight: 500; color: #475569; margin-top: 2px; }
+  .box-title {
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.15;
+    margin-bottom: 6px;
+    letter-spacing: 0.2px;
+  }
+  .box-body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    min-height: 24px;
+  }
+  .box-shape {
+    margin-top: 6px;
+    font-size: 9px;
+    color: rgba(31, 41, 55, 0.7);
+    font-family: "SF Mono", Menlo, monospace;
+  }
 
-  .box-addnorm  { background-color: #fef3c7; }
+  .box-addnorm  { background-color: #fef3c7; min-width: 150px; }
   .box-attn     { background-color: #fed7aa; }
-  .box-attn.masked { background-image: repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(0,0,0,0.08) 6px, rgba(0,0,0,0.08) 8px), linear-gradient(180deg, rgba(255,255,255,0.35), rgba(0,0,0,0.05)); background-color: #fed7aa; }
+  .box-attn.masked { background-image:
+    repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(0,0,0,0.10) 6px, rgba(0,0,0,0.10) 8px),
+    linear-gradient(180deg, rgba(255,255,255,0.45), rgba(0,0,0,0.05));
+    background-color: #fed7aa; }
   .box-ffn      { background-color: #bfdbfe; }
   .box-linear   { background-color: #ddd6fe; }
   .box-softmax  { background-color: #bbf7d0; }
   .box-embed    { background-color: #fbcfe8; }
+
+  /* Matrix mini-vis inside boxes */
+  .mini-mat {
+    display: grid;
+    gap: 1px;
+    padding: 2px;
+    background: rgba(0, 0, 0, 0.18);
+    border-radius: 3px;
+  }
+  .heads-overflow {
+    font-size: 10px;
+    font-weight: 700;
+    color: rgba(31, 41, 55, 0.65);
+    padding: 0 2px;
+  }
+  .embed-mat {
+    display: grid;
+    gap: 1px;
+    padding: 2px;
+    background: rgba(0, 0, 0, 0.18);
+    border-radius: 3px;
+  }
+  .ffn-vis {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 48px;
+  }
+  .ffn-bar {
+    width: 16px;
+    background: linear-gradient(180deg, rgba(99,102,241,0.85), rgba(67,56,202,0.95));
+    border-radius: 2px 2px 0 0;
+    position: relative;
+    border: 1px solid rgba(0,0,0,0.3);
+  }
+  .ffn-bar.wide { background: linear-gradient(180deg, rgba(168,85,247,0.85), rgba(126,34,206,0.95)); }
+  .ffn-bar .label {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 8px;
+    font-weight: 700;
+    color: #1f2937;
+    white-space: nowrap;
+  }
+  .ffn-arrow { font-size: 10px; color: rgba(0,0,0,0.5); margin-bottom: 4px; }
+  .vocab-bars {
+    display: flex;
+    gap: 1px;
+    align-items: flex-end;
+    height: 38px;
+    padding: 2px;
+    background: rgba(0,0,0,0.18);
+    border-radius: 3px;
+  }
+  .vocab-bars > div {
+    width: 5px;
+    background: linear-gradient(180deg, rgba(59,130,246,0.85), rgba(29,78,216,0.95));
+    border-radius: 1px 1px 0 0;
+    border: 0.5px solid rgba(0,0,0,0.3);
+  }
+  .vocab-bars > div.winner { background: linear-gradient(180deg, #4ade80, #16a34a); box-shadow: 0 0 4px rgba(74,222,128,0.6); }
+  .addnorm-glyph {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(0,0,0,0.45);
+    display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.35);
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .tokens-row {
+    display: flex;
+    gap: 3px;
+  }
+  .token-mini {
+    width: 22px; height: 22px;
+    border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700;
+    color: white;
+    border: 1px solid rgba(0,0,0,0.3);
+    box-shadow: inset 0 -2px 0 rgba(0,0,0,0.18);
+  }
 
   /* layer-group wrapper */
   .layer-group {
@@ -472,15 +576,113 @@ function focusBox(el, type, ctx) {
 }
 
 // ============================================================================
+// Matrix / chart renderers (inner content for boxes)
+// ============================================================================
+function renderAttnHeads(kind) {
+  const seqQ = state.seq_len;
+  const seqK = state.seq_len;
+  const headsShow = Math.min(state.num_heads, 4);
+  const cellSize = state.seq_len > 6 ? 5 : (state.seq_len > 4 ? 6 : 7);
+  const isCross = kind === 'cross';
+  let html = '';
+  for (let h = 0; h < headsShow; h++) {
+    const cells = [];
+    for (let i = 0; i < seqQ; i++) {
+      for (let j = 0; j < seqK; j++) {
+        let w = 0;
+        if (kind === 'self-enc') {
+          // diag-heavy with neighbour spread; small noise per head
+          w = (i === j) ? 0.55 : 0.12 + 0.25 * Math.exp(-Math.abs(i - j) * (0.5 + h * 0.1));
+        } else if (kind === 'masked') {
+          if (j > i) w = 0;
+          else w = (j === i) ? 0.5 : 0.18 + 0.05 * (h % 2);
+        } else { // cross
+          if (state.task === 'reverse') w = (j === seqK - 1 - i) ? 0.7 : 0.06;
+          else if (state.task === 'sort') w = (j === i) ? 0.35 : (j < i ? 0.22 : 0.10);
+          else w = (j === i) ? 0.65 : 0.08;
+        }
+        let bg;
+        if (w === 0) bg = 'rgba(0,0,0,0.35)';   // masked → very dark
+        else if (isCross) bg = `rgba(124, 45, 18, ${0.25 + w * 0.7})`;
+        else bg = `rgba(91, 33, 182, ${0.25 + w * 0.7})`;
+        cells.push(`<div style="width:${cellSize}px;height:${cellSize}px;background:${bg}"></div>`);
+      }
+    }
+    html += `<div class="mini-mat" style="grid-template-columns:repeat(${seqK},${cellSize}px);">${cells.join('')}</div>`;
+  }
+  if (state.num_heads > headsShow) {
+    html += `<span class="heads-overflow">+${state.num_heads - headsShow} heads</span>`;
+  }
+  return html;
+}
+
+function renderEmbedMatrix(kind) {
+  const cols = Math.min(14, Math.floor(state.d_model / 8));
+  const rows = state.seq_len;
+  const cellSize = rows > 6 ? 6 : 8;
+  const tokens = kind === 'in' ? state.src : computeTarget(state.src, state.task);
+  const cells = [];
+  for (let r = 0; r < rows; r++) {
+    const tok = tokens[r] !== undefined ? tokens[r] : 3;
+    for (let c = 0; c < cols; c++) {
+      const seed = (tok * 97 + c * 31) & 0xff;
+      const hue = (seed * 1.4 + tok * 47) % 360;
+      const light = 32 + (seed % 36);
+      cells.push(`<div style="width:${cellSize}px;height:${cellSize}px;background:hsl(${hue},70%,${light}%);border-radius:1px;"></div>`);
+    }
+  }
+  return `<div class="embed-mat" style="grid-template-columns:repeat(${cols},${cellSize}px);">${cells.join('')}</div>`;
+}
+
+function renderFFN() {
+  // 3 bars: d_model, d_ff, d_model. Heights proportional with sqrt for visibility.
+  const maxH = 44;
+  const baseH = maxH * 0.35;
+  const wideH = Math.min(maxH, baseH + (maxH - baseH) * Math.min(1, (state.d_ff / state.d_model - 1) / 15));
+  return `
+    <div class="ffn-vis">
+      <div class="ffn-bar" style="height:${baseH}px;"><div class="label">${state.d_model}</div></div>
+      <span class="ffn-arrow">→</span>
+      <div class="ffn-bar wide" style="height:${wideH}px;"><div class="label">${state.d_ff}</div></div>
+      <span class="ffn-arrow">→</span>
+      <div class="ffn-bar" style="height:${baseH}px;"><div class="label">${state.d_model}</div></div>
+    </div>
+  `;
+}
+
+function renderVocabBars(winnerIdx) {
+  const probs = [];
+  for (let i = 0; i < VOCAB; i++) {
+    const d = Math.abs(i - winnerIdx);
+    probs.push(Math.exp(-d * d / 1.5));
+  }
+  const max = Math.max(...probs);
+  return `<div class="vocab-bars">` + probs.map((p, i) =>
+    `<div class="${i === winnerIdx ? 'winner' : ''}" style="height:${(p / max) * 100}%"></div>`
+  ).join('') + `</div>`;
+}
+
+function renderTokens(ids) {
+  return `<div class="tokens-row">` + ids.map(id => {
+    const lab = id === 1 ? 'SOS' : id === 2 ? 'EOS' : id === 0 ? 'PAD' : id;
+    return `<div class="token-mini" style="background:${tokenColor(id)}">${lab}</div>`;
+  }).join('') + `</div>`;
+}
+
+// ============================================================================
 // Build diagram
 // ============================================================================
-function makeBox(label, cls, type, ctx, smallText) {
+function makeBox(opts) {
+  // opts: { title, body?, shape?, cls, type, ctx }
   const div = document.createElement('div');
-  div.className = `box ${cls}`;
-  div.dataset.type = type;
-  div.dataset.ctx = ctx || '';
-  div.innerHTML = `${label}${smallText ? `<span class="small">${smallText}</span>` : ''}`;
-  div.addEventListener('click', e => { e.stopPropagation(); focusBox(div, type, ctx); });
+  div.className = `box ${opts.cls}`;
+  div.dataset.type = opts.type || '';
+  div.dataset.ctx = opts.ctx == null ? '' : String(opts.ctx);
+  let html = `<div class="box-title">${opts.title}</div>`;
+  if (opts.body) html += `<div class="box-body">${opts.body}</div>`;
+  if (state.show_shapes && opts.shape) html += `<div class="box-shape">${opts.shape}</div>`;
+  div.innerHTML = html;
+  div.addEventListener('click', e => { e.stopPropagation(); focusBox(div, opts.type, opts.ctx); });
   return div;
 }
 
@@ -495,33 +697,53 @@ function buildPE(side) {
   return div;
 }
 
+function addNormBox(role, layer, ctx) {
+  const b = makeBox({
+    title: 'Add & Norm',
+    body: '<span class="addnorm-glyph">⊕</span>',
+    cls: 'box-addnorm',
+    type: 'addnorm',
+    ctx,
+  });
+  b.dataset.role = role;
+  b.dataset.layer = layer;
+  return b;
+}
+
 function buildEncoderColumn() {
   const col = document.createElement('div');
   col.className = 'col enc';
 
-  // From bottom up: Input Embedding → PE → (MHA → A&N → FFN → A&N) × N
   const group = document.createElement('div');
   group.className = 'layer-group enc-group';
 
-  // Layer block: Multi-Head Attention → Add&Norm → FFN → Add&Norm (one unit per N)
   for (let l = 1; l <= state.enc_layers; l++) {
     if (l > 1) {
       const sep = document.createElement('div');
       sep.style.height = '12px';
       group.appendChild(sep);
     }
-    const mha = makeBox('Multi-Head<br>Attention', 'box-attn', 'mha-enc', l, state.show_shapes ? `(B, L_src, ${state.d_model})` : null);
-    mha.dataset.role = 'mha';
-    mha.dataset.layer = l;
-    const an1 = makeBox('Add & Norm', 'box-addnorm', 'addnorm', `enc L${l} after MHA`);
-    an1.dataset.role = 'an1';
-    an1.dataset.layer = l;
-    const ffn = makeBox('Feed<br>Forward', 'box-ffn', 'ffn', `enc L${l}`, state.show_shapes ? `${state.d_model} → ${state.d_ff} → ${state.d_model}` : null);
-    ffn.dataset.role = 'ffn';
-    ffn.dataset.layer = l;
-    const an2 = makeBox('Add & Norm', 'box-addnorm', 'addnorm', `enc L${l} after FFN`);
-    an2.dataset.role = 'an2';
-    an2.dataset.layer = l;
+    const mha = makeBox({
+      title: `Multi-Head Attention`,
+      body: renderAttnHeads('self-enc'),
+      shape: `(B, L_src, ${state.d_model})`,
+      cls: 'box-attn',
+      type: 'mha-enc',
+      ctx: l,
+    });
+    mha.dataset.role = 'mha'; mha.dataset.layer = l;
+    const an1 = addNormBox('an1', l, `enc L${l} after MHA`);
+    const ffn = makeBox({
+      title: 'Feed Forward',
+      body: renderFFN(),
+      shape: `${state.d_model} → ${state.d_ff} → ${state.d_model}`,
+      cls: 'box-ffn',
+      type: 'ffn',
+      ctx: `enc L${l}`,
+    });
+    ffn.dataset.role = 'ffn'; ffn.dataset.layer = l;
+    const an2 = addNormBox('an2', l, `enc L${l} after FFN`);
+
     group.appendChild(mha);
     group.appendChild(an1);
     group.appendChild(ffn);
@@ -535,13 +757,26 @@ function buildEncoderColumn() {
 
   col.appendChild(group);
   col.appendChild(buildPE('enc'));
-  col.appendChild(makeBox('Input<br>Embedding', 'box-embed', 'embed-in'));
-  const lbl = document.createElement('div');
-  lbl.className = 'io-label';
-  lbl.innerHTML = 'Inputs <small>(src)</small>';
-  col.appendChild(lbl);
+  col.appendChild(makeBox({
+    title: 'Input Embedding × √d',
+    body: renderEmbedMatrix('in'),
+    shape: `(B, ${state.seq_len}, ${state.d_model})`,
+    cls: 'box-embed',
+    type: 'embed-in',
+  }));
+  const tokensRow = makeBox({
+    title: 'Inputs (src tokens)',
+    body: renderTokens(state.src),
+    shape: `(B, ${state.seq_len})`,
+    cls: 'box-embed',
+    type: 'embed-in',
+  });
+  tokensRow.style.background = 'rgba(255,255,255,0.03)';
+  tokensRow.style.color = '#c9d1d9';
+  tokensRow.style.border = '1px dashed #30363d';
+  tokensRow.style.boxShadow = 'none';
+  col.appendChild(tokensRow);
 
-  // top → bottom in DOM, but visually we want bottom→up. Use flex column-reverse via wrapping.
   reverseColumn(col);
   return col;
 }
@@ -559,24 +794,37 @@ function buildDecoderColumn() {
       sep.style.height = '12px';
       group.appendChild(sep);
     }
-    const mhaM = makeBox('Masked<br>Multi-Head<br>Attention', 'box-attn masked', 'mha-masked', l);
-    mhaM.dataset.role = 'mha-masked';
-    mhaM.dataset.layer = l;
-    const an1 = makeBox('Add & Norm', 'box-addnorm', 'addnorm', `dec L${l} after masked`);
-    an1.dataset.role = 'an1';
-    an1.dataset.layer = l;
-    const mhaC = makeBox('Multi-Head<br>Attention', 'box-attn', 'mha-cross', l, state.show_shapes ? `cross K,V ← enc` : null);
-    mhaC.dataset.role = 'mha-cross';
-    mhaC.dataset.layer = l;
-    const an2 = makeBox('Add & Norm', 'box-addnorm', 'addnorm', `dec L${l} after cross`);
-    an2.dataset.role = 'an2';
-    an2.dataset.layer = l;
-    const ffn = makeBox('Feed<br>Forward', 'box-ffn', 'ffn', `dec L${l}`);
-    ffn.dataset.role = 'ffn';
-    ffn.dataset.layer = l;
-    const an3 = makeBox('Add & Norm', 'box-addnorm', 'addnorm', `dec L${l} after FFN`);
-    an3.dataset.role = 'an3';
-    an3.dataset.layer = l;
+    const mhaM = makeBox({
+      title: 'Masked Multi-Head Attention',
+      body: renderAttnHeads('masked'),
+      shape: `(B, L_tgt, ${state.d_model})`,
+      cls: 'box-attn masked',
+      type: 'mha-masked',
+      ctx: l,
+    });
+    mhaM.dataset.role = 'mha-masked'; mhaM.dataset.layer = l;
+    const an1 = addNormBox('an1', l, `dec L${l} after masked`);
+    const mhaC = makeBox({
+      title: 'Multi-Head Attention',
+      body: renderAttnHeads('cross'),
+      shape: `Q←dec, K,V←enc`,
+      cls: 'box-attn',
+      type: 'mha-cross',
+      ctx: l,
+    });
+    mhaC.dataset.role = 'mha-cross'; mhaC.dataset.layer = l;
+    const an2 = addNormBox('an2', l, `dec L${l} after cross`);
+    const ffn = makeBox({
+      title: 'Feed Forward',
+      body: renderFFN(),
+      shape: `${state.d_model} → ${state.d_ff} → ${state.d_model}`,
+      cls: 'box-ffn',
+      type: 'ffn',
+      ctx: `dec L${l}`,
+    });
+    ffn.dataset.role = 'ffn'; ffn.dataset.layer = l;
+    const an3 = addNormBox('an3', l, `dec L${l} after FFN`);
+
     group.appendChild(mhaM);
     group.appendChild(an1);
     group.appendChild(mhaC);
@@ -590,15 +838,48 @@ function buildDecoderColumn() {
   nx.textContent = `${state.dec_layers}×`;
   group.appendChild(nx);
 
-  col.appendChild(makeBox('Softmax', 'box-softmax', 'softmax'));
-  col.appendChild(makeBox('Linear', 'box-linear', 'linear'));
+  const target = computeTarget(state.src, state.task);
+  const winner = target[0] !== undefined ? target[0] : 6;
+
+  col.appendChild(makeBox({
+    title: 'Softmax',
+    body: renderVocabBars(winner),
+    shape: `(B, L_tgt, ${VOCAB})`,
+    cls: 'box-softmax',
+    type: 'softmax',
+  }));
+  col.appendChild(makeBox({
+    title: 'Linear',
+    body: `<div style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:#1f2937;">
+      <div class="ffn-bar" style="height:24px;width:14px;"><div class="label">${state.d_model}</div></div>
+      <span class="ffn-arrow">→</span>
+      <div class="ffn-bar wide" style="height:36px;width:18px;"><div class="label">${VOCAB}</div></div>
+    </div>`,
+    shape: `(B, L_tgt, ${VOCAB})`,
+    cls: 'box-linear',
+    type: 'linear',
+  }));
   col.appendChild(group);
   col.appendChild(buildPE('dec'));
-  col.appendChild(makeBox('Output<br>Embedding', 'box-embed', 'embed-out'));
-  const lbl = document.createElement('div');
-  lbl.className = 'io-label';
-  lbl.innerHTML = 'Outputs <small>(shifted right)</small>';
-  col.appendChild(lbl);
+  col.appendChild(makeBox({
+    title: 'Output Embedding × √d',
+    body: renderEmbedMatrix('out'),
+    shape: `(B, L_tgt, ${state.d_model})`,
+    cls: 'box-embed',
+    type: 'embed-out',
+  }));
+  const tokensRow = makeBox({
+    title: 'Outputs (shifted right)',
+    body: renderTokens([1, ...target.slice(0, -1)]),  // SOS + first L-1 tokens
+    shape: `(B, L_tgt)`,
+    cls: 'box-embed',
+    type: 'embed-out',
+  });
+  tokensRow.style.background = 'rgba(255,255,255,0.03)';
+  tokensRow.style.color = '#c9d1d9';
+  tokensRow.style.border = '1px dashed #30363d';
+  tokensRow.style.boxShadow = 'none';
+  col.appendChild(tokensRow);
 
   reverseColumn(col);
   return col;
