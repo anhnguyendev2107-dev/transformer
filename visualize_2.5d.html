@@ -568,7 +568,22 @@ function applyZoom() {
   requestAnimationFrame(drawArrows);
 }
 function setZoom(z) {
-  state.zoom = Math.max(0.4, Math.min(2.5, z));
+  state.zoom = Math.max(0.2, Math.min(2.5, z));
+  applyZoom();
+}
+function autoFit() {
+  const wrap = document.getElementById('scene-wrap');
+  const diagram = document.getElementById('diagram');
+  if (!wrap || !diagram) return;
+  // offsetWidth/Height are pre-transform — natural CSS dimensions.
+  const naturalW = diagram.offsetWidth;
+  const naturalH = diagram.offsetHeight;
+  if (!naturalW || !naturalH) return;
+  const availW = wrap.clientWidth - 40;
+  const availH = wrap.clientHeight - 40;
+  // Account for tilt's slight visual expansion with a 1.12 fudge factor.
+  const fit = Math.min(availW / (naturalW * 1.12), availH / (naturalH * 1.12));
+  state.zoom = Math.max(0.2, Math.min(1.2, fit));
   applyZoom();
 }
 
@@ -1024,7 +1039,8 @@ function buildDiagram() {
   inner.appendChild(buildEncoderColumn());
   inner.appendChild(buildDecoderColumn());
 
-  requestAnimationFrame(drawArrows);
+  // Defer to next frame so offsetWidth reflects the laid-out content.
+  requestAnimationFrame(autoFit);
   updateStats();
   updatePred();
 }
@@ -1284,7 +1300,7 @@ function setupControls() {
     applyZoom();
   });
 
-  window.addEventListener('resize', () => requestAnimationFrame(drawArrows));
+  window.addEventListener('resize', () => requestAnimationFrame(autoFit));
   document.getElementById('scene-wrap').addEventListener('scroll', () => requestAnimationFrame(drawArrows));
 }
 
