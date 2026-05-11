@@ -595,8 +595,7 @@ function autoFit() {
   const wrap = document.getElementById('scene-wrap');
   const diagram = document.getElementById('diagram');
   if (!wrap || !diagram) return;
-  // Measure at the CURRENT zoom (don't pop transform to scale(1) — that caused
-  // a visible scale(prev → 1 → fit) bounce on every param change).
+  // Measure at the CURRENT zoom (don't pop transform → that flashes).
   const r = diagram.getBoundingClientRect();
   const currentZoom = state.zoom || 1;
   if (!r.width || !r.height || !currentZoom) return;
@@ -604,15 +603,24 @@ function autoFit() {
   const naturalH = r.height / currentZoom;
   const availW = wrap.clientWidth - 40;
   const availH = wrap.clientHeight - 40;
-  const fit = Math.min(availW / naturalW, availH / naturalH);
-  const newZoom = Math.max(0.2, Math.min(1.2, fit));
-  // Only repaint if the zoom actually changed meaningfully.
-  if (Math.abs(newZoom - state.zoom) > 0.005) {
+  // Primarily fit by width — vertical scroll is natural for tall diagrams.
+  // Don't shrink below 0.55 just to fit height (would make everything tiny).
+  const widthFit = availW / naturalW;
+  const heightFit = availH / naturalH;
+  const fit = Math.min(widthFit, Math.max(heightFit, 0.55));
+  const newZoom = Math.max(0.4, Math.min(1.0, fit));
+  const changed = Math.abs(newZoom - state.zoom) > 0.005;
+  if (changed) {
     state.zoom = newZoom;
     applyZoom();
   } else {
     requestAnimationFrame(drawArrows);
   }
+  // After layout settles, scroll the scene so the diagram is centered in view.
+  requestAnimationFrame(() => {
+    wrap.scrollLeft = Math.max(0, (wrap.scrollWidth - wrap.clientWidth) / 2);
+    wrap.scrollTop = Math.max(0, (wrap.scrollHeight - wrap.clientHeight) / 2);
+  });
 }
 
 const VOCAB = 15;
