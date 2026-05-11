@@ -28,6 +28,8 @@
     flex: 1;
     position: relative;
     overflow: auto;
+    display: grid;
+    place-items: center;
   }
 
   /* === Sidebar (kept similar) === */
@@ -57,12 +59,10 @@
     position: relative;
     padding: 30px 24px 50px;
     width: fit-content;
-    min-height: 100%;
     transform-origin: center center;
     transform: perspective(1800px) rotateX(8deg) rotateY(-9deg) scale(1);
     transform-style: preserve-3d;
     transition: transform 0.08s linear;
-    margin: auto;
   }
   /* tilted floor grid for depth */
   .diagram::before {
@@ -603,12 +603,11 @@ function autoFit() {
   const naturalH = r.height / currentZoom;
   const availW = wrap.clientWidth - 40;
   const availH = wrap.clientHeight - 40;
-  // Primarily fit by width — vertical scroll is natural for tall diagrams.
-  // Don't shrink below 0.55 just to fit height (would make everything tiny).
+  // Strict fit: both width and height must fit (no scrolling needed).
   const widthFit = availW / naturalW;
   const heightFit = availH / naturalH;
-  const fit = Math.min(widthFit, Math.max(heightFit, 0.55));
-  const newZoom = Math.max(0.4, Math.min(1.0, fit));
+  const fit = Math.min(widthFit, heightFit);
+  const newZoom = Math.max(0.3, Math.min(1.0, fit));
   const changed = Math.abs(newZoom - state.zoom) > 0.005;
   if (changed) {
     state.zoom = newZoom;
