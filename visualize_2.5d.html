@@ -649,16 +649,24 @@ function autoFit() {
   // Small safety margin for the few pixels of pseudo-element extension.
   const fit = Math.min(widthFit, heightFit) * 0.96;
   const newZoom = Math.max(0.25, Math.min(1.0, fit));
-  // Reset pan on autoFit (every rebuild / resize) so the diagram re-centers.
   state.pan_x = 0;
   state.pan_y = 0;
-  const changed = Math.abs(newZoom - state.zoom) > 0.005;
-  if (changed) {
-    state.zoom = newZoom;
+  state.zoom = newZoom;
+  applyZoom();
+  // After the transform settles, measure the true visual bbox and pan so the
+  // visual center (which is shifted by tilt + asymmetric box-shadow extending
+  // down-right) lines up with the scene-wrap center.
+  requestAnimationFrame(() => {
+    const bbox2 = getVisualBbox(diagram);
+    const wRect = wrap.getBoundingClientRect();
+    const wrapCx = wRect.left + wRect.width / 2;
+    const wrapCy = wRect.top + wRect.height / 2;
+    const bboxCx = bbox2.left + bbox2.width / 2;
+    const bboxCy = bbox2.top + bbox2.height / 2;
+    state.pan_x += wrapCx - bboxCx;
+    state.pan_y += wrapCy - bboxCy;
     applyZoom();
-  } else {
-    applyZoom();
-  }
+  });
 }
 
 const VOCAB = 15;
