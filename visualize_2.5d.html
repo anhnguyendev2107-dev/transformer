@@ -59,8 +59,35 @@
     min-height: 100%;
     min-width: 760px;
     transform-origin: top center;
-    transform: perspective(2400px) rotateX(2deg) rotateY(-3deg);
+    transform: perspective(2400px) rotateX(2deg) rotateY(-3deg) scale(1);
+    transition: transform 0.06s linear;
   }
+  .zoom-bar {
+    position: absolute;
+    right: 20px;
+    top: 20px;
+    z-index: 6;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding: 4px 8px;
+    background: rgba(22, 27, 34, 0.9);
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    color: #c9d1d9;
+  }
+  .zoom-bar button {
+    width: 22px; height: 22px;
+    background: #21262d; color: #c9d1d9;
+    border: 1px solid #30363d; border-radius: 4px;
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 13px; line-height: 1;
+  }
+  .zoom-bar button:hover { background: #30363d; }
+  .zoom-bar .zoom-val { min-width: 42px; text-align: center; color: #7ee787; }
   .diagram-inner {
     position: relative;
     display: grid;
@@ -289,23 +316,37 @@
   .arrow-line.flow.animated { stroke-dasharray: 6 6; animation: dashmove 1s linear infinite; }
   @keyframes dashmove { to { stroke-dashoffset: -24; } }
 
-  /* === Info card === */
-  .info-card {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    width: 280px;
-    padding: 14px;
-    background: rgba(22, 27, 34, 0.95);
+  /* === Tooltip (hover info) === */
+  .tooltip {
+    position: fixed;
+    top: 0; left: 0;
+    max-width: 320px;
+    padding: 12px 14px;
+    background: rgba(22, 27, 34, 0.97);
     border: 1px solid #30363d;
     border-radius: 8px;
-    z-index: 5;
+    z-index: 1000;
+    pointer-events: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.55);
     backdrop-filter: blur(10px);
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+    transition: opacity 0.12s;
   }
-  .info-card h2 { font-size: 13px; color: #f0883e; margin-bottom: 6px; }
-  .info-card .desc { font-size: 12px; color: #c9d1d9; line-height: 1.5; }
-  .info-card .shape-row { margin-top: 8px; padding: 6px 10px; background: #0d1117; border-radius: 4px; font-family: monospace; font-size: 11px; color: #7ee787; }
-  .info-card .formula { margin-top: 8px; padding: 6px 10px; background: #0d1117; border-left: 2px solid #58a6ff; font-family: monospace; font-size: 11px; color: #c9d1d9; white-space: pre-wrap; }
+  .tooltip.visible { opacity: 1; }
+  .tooltip h2 { font-size: 12px; color: #f0883e; margin-bottom: 4px; }
+  .tooltip .desc { font-size: 11px; color: #c9d1d9; line-height: 1.5; }
+  .tooltip .shape-row {
+    margin-top: 6px; padding: 4px 8px;
+    background: #0d1117; border-radius: 4px;
+    font-family: "SF Mono", Menlo, monospace; font-size: 10px; color: #7ee787;
+  }
+  .tooltip .formula {
+    margin-top: 6px; padding: 4px 8px;
+    background: #0d1117; border-left: 2px solid #58a6ff;
+    font-family: "SF Mono", Menlo, monospace; font-size: 10px;
+    color: #c9d1d9; white-space: pre-wrap;
+  }
 
   .stats {
     position: absolute;
@@ -429,9 +470,11 @@
 
   <div class="scene-wrap" id="scene-wrap">
     <div class="stats" id="stats"></div>
-    <div class="info-card" id="info-card">
-      <h2>Click block bên trái để xem chi tiết</h2>
-      <div class="desc">Diagram theo paper "Attention Is All You Need" (Vaswani et al., 2017). Encoder (trái) đọc src thành memory. Decoder (phải) sinh tgt autoregressive, dùng memory qua cross-attention. Nx = số layer xếp chồng.</div>
+    <div class="zoom-bar">
+      <button id="zoom-out" title="Zoom out (or ⌘/Ctrl + scroll)">−</button>
+      <span class="zoom-val" id="zoom-val">100%</span>
+      <button id="zoom-in" title="Zoom in">+</button>
+      <button id="zoom-reset" title="Reset to 100%" style="width:auto;padding:0 6px;font-size:10px;">1:1</button>
     </div>
     <div class="diagram" id="diagram">
       <svg class="arrows-svg" id="arrows" preserveAspectRatio="none">
@@ -449,10 +492,12 @@
       </svg>
       <div class="diagram-inner" id="diagram-inner"></div>
     </div>
-    <div class="hint">Click block bất kỳ để xem mô tả · đổi params bên trái để rebuild</div>
+    <div class="hint">Hover vào block để xem mô tả · ⌘/Ctrl + scroll để zoom · đổi params bên trái để rebuild</div>
   </div>
 
 </div>
+
+<div class="tooltip" id="tooltip"></div>
 
 <script>
 // ============================================================================
@@ -472,8 +517,22 @@ const state = {
   show_flow: true,
   show_shapes: false,
   tilt_3d: true,
+  zoom: 1,
   focused_id: null,
 };
+
+function applyZoom() {
+  const d = document.getElementById('diagram');
+  const tilt = state.tilt_3d ? 'perspective(2400px) rotateX(2deg) rotateY(-3deg) ' : '';
+  d.style.transform = `${tilt}scale(${state.zoom})`;
+  document.getElementById('zoom-val').textContent = Math.round(state.zoom * 100) + '%';
+  // Arrows need redraw because getBoundingClientRect reflects post-transform.
+  requestAnimationFrame(drawArrows);
+}
+function setZoom(z) {
+  state.zoom = Math.max(0.4, Math.min(2.5, z));
+  applyZoom();
+}
 
 const VOCAB = 15;
 function tokenColor(id) {
@@ -563,16 +622,39 @@ function describe(type, ctx) {
   return tbl[type] || { title: type, desc: '', shape: '', formula: '' };
 }
 
-function focusBox(el, type, ctx) {
+function focusBox(el) {
   document.querySelectorAll('.box.focused').forEach(b => b.classList.remove('focused'));
   el.classList.add('focused');
+}
+
+// ============================================================================
+// Tooltip
+// ============================================================================
+const tooltipEl = document.getElementById('tooltip');
+function showTooltip(type, ctx) {
   const info = describe(type, ctx);
-  document.getElementById('info-card').innerHTML = `
+  tooltipEl.innerHTML = `
     <h2>${info.title}</h2>
     <div class="desc">${info.desc}</div>
-    <div class="shape-row">${info.shape}</div>
-    <div class="formula">${info.formula}</div>
+    ${info.shape ? `<div class="shape-row">${info.shape}</div>` : ''}
+    ${info.formula ? `<div class="formula">${info.formula}</div>` : ''}
   `;
+  tooltipEl.classList.add('visible');
+}
+function hideTooltip() {
+  tooltipEl.classList.remove('visible');
+}
+function positionTooltip(clientX, clientY) {
+  const pad = 14;
+  const w = tooltipEl.offsetWidth;
+  const h = tooltipEl.offsetHeight;
+  let x = clientX + 16;
+  let y = clientY + 16;
+  if (x + w + pad > window.innerWidth) x = clientX - w - 16;
+  if (y + h + pad > window.innerHeight) y = clientY - h - 16;
+  if (x < pad) x = pad;
+  if (y < pad) y = pad;
+  tooltipEl.style.transform = `translate3d(${x}px, ${y}px, 0)`;
 }
 
 // ============================================================================
@@ -682,7 +764,10 @@ function makeBox(opts) {
   if (opts.body) html += `<div class="box-body">${opts.body}</div>`;
   if (state.show_shapes && opts.shape) html += `<div class="box-shape">${opts.shape}</div>`;
   div.innerHTML = html;
-  div.addEventListener('click', e => { e.stopPropagation(); focusBox(div, opts.type, opts.ctx); });
+  div.addEventListener('click', e => { e.stopPropagation(); focusBox(div); });
+  div.addEventListener('mouseenter', e => showTooltip(opts.type, opts.ctx));
+  div.addEventListener('mousemove', e => positionTooltip(e.clientX, e.clientY));
+  div.addEventListener('mouseleave', hideTooltip);
   return div;
 }
 
@@ -1120,11 +1205,18 @@ function setupControls() {
   document.getElementById('show-shapes').addEventListener('change', e => { state.show_shapes = e.target.checked; buildDiagram(); });
   document.getElementById('tilt-3d').addEventListener('change', e => {
     state.tilt_3d = e.target.checked;
-    document.getElementById('diagram').style.transform = state.tilt_3d
-      ? 'perspective(2400px) rotateX(2deg) rotateY(-3deg)'
-      : 'none';
-    requestAnimationFrame(drawArrows);
+    applyZoom();
   });
+
+  // Zoom controls
+  document.getElementById('zoom-in').addEventListener('click', () => setZoom(state.zoom * 1.15));
+  document.getElementById('zoom-out').addEventListener('click', () => setZoom(state.zoom / 1.15));
+  document.getElementById('zoom-reset').addEventListener('click', () => setZoom(1));
+  document.getElementById('scene-wrap').addEventListener('wheel', e => {
+    if (!(e.ctrlKey || e.metaKey)) return;  // require modifier to avoid hijacking scroll
+    e.preventDefault();
+    setZoom(state.zoom * (e.deltaY > 0 ? 0.92 : 1.08));
+  }, { passive: false });
 
   document.getElementById('reset-view').addEventListener('click', () => {
     state.src = [3, 4, 5, 6];
@@ -1135,6 +1227,7 @@ function setupControls() {
     state.enc_layers = 2;
     state.dec_layers = 2;
     state.task = 'reverse';
+    state.zoom = 1;
     document.getElementById('src-input').value = '3,4,5,6';
     document.getElementById('src-display').textContent = '[3,4,5,6]';
     document.getElementById('seq-len').value = 4;
@@ -1151,6 +1244,7 @@ function setupControls() {
     document.getElementById('num-heads-val').textContent = 8;
     document.querySelectorAll('#task-toggles .toggle').forEach(x => x.classList.toggle('active', x.dataset.val === 'reverse'));
     buildDiagram();
+    applyZoom();
   });
 
   window.addEventListener('resize', () => requestAnimationFrame(drawArrows));
