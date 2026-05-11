@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>Transformer 2.5D — Interactive</title>
+<title>Transformer 2.5D — Paper-style Interactive</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
@@ -13,8 +13,6 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     user-select: none;
   }
-
-  /* === Layout === */
   .app { display: flex; height: 100vh; }
   .sidebar {
     width: 320px;
@@ -29,297 +27,165 @@
   .scene-wrap {
     flex: 1;
     position: relative;
-    cursor: grab;
-    overflow: hidden;
+    overflow: auto;
   }
-  .scene-wrap.dragging { cursor: grabbing; }
 
-  /* === Sidebar === */
-  h1 {
-    font-size: 16px;
-    color: #58a6ff;
-    margin-bottom: 4px;
-    letter-spacing: 0.5px;
-  }
-  .sub {
-    font-size: 11px;
-    color: #6e7681;
-    margin-bottom: 20px;
-  }
-  .group {
-    margin-bottom: 16px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid #21262d;
-  }
+  /* === Sidebar (kept similar) === */
+  h1 { font-size: 16px; color: #58a6ff; margin-bottom: 4px; letter-spacing: 0.5px; }
+  .sub { font-size: 11px; color: #6e7681; margin-bottom: 20px; }
+  .group { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #21262d; }
   .group:last-child { border-bottom: none; }
-  .group-title {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: #6e7681;
-    margin-bottom: 10px;
-  }
-  .control {
-    margin-bottom: 12px;
-  }
-  .control-label {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    margin-bottom: 6px;
-  }
+  .group-title { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #6e7681; margin-bottom: 10px; }
+  .control { margin-bottom: 12px; }
+  .control-label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; }
   .control-label .name { color: #c9d1d9; }
-  .control-label .value {
-    color: #7ee787;
-    font-family: "SF Mono", Menlo, monospace;
-    background: #161b22;
-    padding: 1px 6px;
-    border-radius: 3px;
-  }
-  input[type="range"] {
-    width: 100%;
-    -webkit-appearance: none;
-    appearance: none;
-    background: transparent;
-    height: 16px;
-  }
-  input[type="range"]::-webkit-slider-runnable-track {
-    background: #21262d;
-    height: 4px;
-    border-radius: 2px;
-  }
-  input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 14px;
-    height: 14px;
-    background: #58a6ff;
-    border-radius: 50%;
-    margin-top: -5px;
-    cursor: pointer;
-  }
-  select, input[type="text"] {
-    width: 100%;
-    padding: 6px 8px;
-    background: #161b22;
-    color: #c9d1d9;
-    border: 1px solid #30363d;
-    border-radius: 4px;
-    font-size: 12px;
-    font-family: "SF Mono", Menlo, monospace;
-  }
-  .toggle-row {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-  }
-  .toggle {
-    flex: 1;
-    min-width: 50px;
-    padding: 6px 8px;
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 4px;
-    font-size: 11px;
-    font-family: "SF Mono", Menlo, monospace;
-    color: #8b949e;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
+  .control-label .value { color: #7ee787; font-family: "SF Mono", Menlo, monospace; background: #161b22; padding: 1px 6px; border-radius: 3px; }
+  input[type="range"] { width: 100%; -webkit-appearance: none; appearance: none; background: transparent; height: 16px; }
+  input[type="range"]::-webkit-slider-runnable-track { background: #21262d; height: 4px; border-radius: 2px; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; background: #58a6ff; border-radius: 50%; margin-top: -5px; cursor: pointer; }
+  input[type="text"] { width: 100%; padding: 6px 8px; background: #161b22; color: #c9d1d9; border: 1px solid #30363d; border-radius: 4px; font-size: 12px; font-family: "SF Mono", Menlo, monospace; }
+  .toggle-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .toggle { flex: 1; min-width: 50px; padding: 6px 8px; background: #161b22; border: 1px solid #30363d; border-radius: 4px; font-size: 11px; font-family: "SF Mono", Menlo, monospace; color: #8b949e; text-align: center; cursor: pointer; transition: all 0.15s; }
   .toggle:hover { border-color: #58a6ff; color: #c9d1d9; }
-  .toggle.active {
-    background: #1f6feb;
-    border-color: #58a6ff;
-    color: white;
+  .toggle.active { background: #1f6feb; border-color: #58a6ff; color: white; }
+  .checkbox { display: flex; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer; font-size: 12px; }
+  button.action { width: 100%; padding: 8px; background: #21262d; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 12px; cursor: pointer; }
+  button.action:hover { background: #30363d; }
+
+  /* === Diagram === */
+  .diagram {
+    position: relative;
+    padding: 40px 60px 80px;
+    min-height: 100%;
+    min-width: 760px;
+    transform-origin: top center;
+    transform: perspective(2400px) rotateX(2deg) rotateY(-3deg);
   }
-  .checkbox {
+  .diagram-inner {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 100px;
+    align-items: end;
+    justify-items: center;
+  }
+  .col {
+    position: relative;
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 8px;
-    padding: 6px 0;
-    cursor: pointer;
-    font-size: 12px;
   }
-  .checkbox input { cursor: pointer; }
-  button.action {
-    width: 100%;
-    padding: 8px;
-    background: #238636;
-    border: none;
-    border-radius: 4px;
-    color: white;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    margin-top: 4px;
-  }
-  button.action:hover { background: #2ea043; }
-  button.secondary {
-    background: #21262d;
-    color: #c9d1d9;
-  }
-  button.secondary:hover { background: #30363d; }
 
-  /* === Scene === */
-  .stage {
-    position: absolute;
-    inset: 0;
-    perspective: 2500px;
-    perspective-origin: 50% 50%;
-  }
-  .world {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform-style: preserve-3d;
-    transform: translate(-50%, -50%) rotateX(-15deg) rotateY(-15deg) rotateZ(0deg);
-    transition: transform 0.05s linear;
-  }
-  .slab {
-    position: absolute;
-    left: 0;
-    top: 0;
-    transform-style: preserve-3d;
-    cursor: pointer;
-    transition: filter 0.2s;
-  }
-  .slab:hover { filter: brightness(1.3); }
-  .slab.focused { filter: brightness(1.5) drop-shadow(0 0 20px #58a6ff); }
-  .slab-plate {
-    background: rgba(22, 27, 34, 0.85);
-    border: 1px solid #30363d;
+  /* === Boxes (paper style colors) === */
+  .box {
+    position: relative;
+    padding: 12px 22px;
     border-radius: 6px;
-    padding: 10px;
-    backdrop-filter: blur(4px);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-  }
-  .slab-title {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: #58a6ff;
-    margin-bottom: 6px;
-  }
-  .slab-shape {
-    position: absolute;
-    bottom: 4px;
-    right: 8px;
-    font-size: 9px;
-    color: #6e7681;
-    font-family: "SF Mono", Menlo, monospace;
-  }
-  .slab-content { position: relative; }
-
-  /* Token row */
-  .token-row { display: flex; gap: 4px; }
-  .token-box {
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    font-weight: 700;
+    text-align: center;
     font-size: 13px;
-    color: white;
-    box-shadow: inset 0 -2px 0 rgba(0,0,0,0.2);
+    font-weight: 600;
+    line-height: 1.25;
+    color: #1f2937;
+    border: 1.5px solid #1f2937;
+    box-shadow:
+      0 2px 0 rgba(0, 0, 0, 0.25),
+      0 4px 12px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
+    min-width: 170px;
+    background-image: linear-gradient(180deg, rgba(255,255,255,0.35), rgba(0,0,0,0.05));
   }
+  .box:hover { transform: translateY(-2px); filter: brightness(1.08); }
+  .box.focused { box-shadow: 0 0 0 3px #58a6ff, 0 4px 12px rgba(88,166,255,0.5); }
+  .box .small { display: block; font-size: 10px; font-weight: 500; color: #475569; margin-top: 2px; }
 
-  /* Matrix grid (embedding / hidden state) */
-  .matrix-grid {
-    display: grid;
-    gap: 1px;
-  }
-  .matrix-cell {
-    width: 12px;
-    height: 12px;
-    border-radius: 1px;
-  }
+  .box-addnorm  { background-color: #fef3c7; }
+  .box-attn     { background-color: #fed7aa; }
+  .box-attn.masked { background-image: repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(0,0,0,0.08) 6px, rgba(0,0,0,0.08) 8px), linear-gradient(180deg, rgba(255,255,255,0.35), rgba(0,0,0,0.05)); background-color: #fed7aa; }
+  .box-ffn      { background-color: #bfdbfe; }
+  .box-linear   { background-color: #ddd6fe; }
+  .box-softmax  { background-color: #bbf7d0; }
+  .box-embed    { background-color: #fbcfe8; }
 
-  /* Attention heatmap */
-  .attn-cell-3d {
-    width: 22px;
-    height: 22px;
+  /* layer-group wrapper */
+  .layer-group {
+    position: relative;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    font-size: 8px;
-    color: white;
-    border-radius: 1px;
+    gap: 8px;
+    padding: 14px 20px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 10px;
+    background: rgba(241, 245, 249, 0.05);
   }
+  .nx-label {
+    position: absolute;
+    right: -42px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 16px;
+    font-weight: 700;
+    color: #c9d1d9;
+    font-style: italic;
+  }
+  .col.dec .nx-label { right: auto; left: -42px; }
 
-  /* Heads stack */
-  .heads-stack {
-    display: flex;
-    gap: 4px;
-  }
-  .head-mini {
-    display: grid;
-    gap: 1px;
-  }
-  .head-mini > div {
-    width: 8px;
-    height: 8px;
-    border-radius: 1px;
-  }
-
-  /* FFN bar */
-  .ffn-vis {
+  /* PE block */
+  .pe {
     display: flex;
     align-items: center;
     gap: 6px;
-    height: 32px;
+    font-size: 12px;
+    color: #c9d1d9;
   }
-  .ffn-block {
-    height: 24px;
-    background: linear-gradient(180deg, #1f6feb, #1158c7);
-    border-radius: 3px;
+  .pe-circle {
+    width: 32px;
+    height: 32px;
+    border: 1.5px solid #c9d1d9;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
-    font-size: 9px;
-    font-family: monospace;
-    min-width: 32px;
+    font-size: 18px;
+    background: rgba(255,255,255,0.05);
   }
-  .ffn-block.wide {
-    background: linear-gradient(180deg, #a371f7, #6e40c9);
-  }
-
-  /* Vocab dist */
-  .vocab-bars-3d {
+  .pe-sin {
+    width: 32px;
+    height: 32px;
+    border: 1.5px solid #c9d1d9;
+    border-radius: 50%;
     display: flex;
-    gap: 2px;
-    align-items: flex-end;
-    height: 40px;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.05);
   }
-  .vocab-bar-3d {
-    width: 8px;
-    background: #58a6ff;
-    border-radius: 1px 1px 0 0;
-  }
-  .vocab-bar-3d.winner { background: #56d364; }
+  .pe-sin svg { width: 22px; height: 22px; }
+  .pe-label { font-size: 10px; color: #8b949e; line-height: 1.1; }
 
-  /* Connecting lines between slabs (drawn via SVG overlay would be hard in 3D —
-     use vertical "pillars" instead) */
-  .pillar {
+  .io-label {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #c9d1d9;
+    font-style: italic;
+  }
+  .io-label small { color: #8b949e; }
+
+  /* === SVG overlay for arrows === */
+  .arrows-svg {
     position: absolute;
-    height: 2px;
-    background: linear-gradient(90deg, rgba(88,166,255,0.1), rgba(88,166,255,0.6), rgba(88,166,255,0.1));
-    border-radius: 1px;
+    inset: 0;
+    pointer-events: none;
+    overflow: visible;
   }
-  .pillar.flow {
-    background: linear-gradient(90deg, rgba(86,211,100,0.2), rgba(86,211,100,0.9), rgba(86,211,100,0.2));
-    animation: flowPulse 2s linear infinite;
-  }
-  @keyframes flowPulse {
-    0% { opacity: 0.4; }
-    50% { opacity: 1; }
-    100% { opacity: 0.4; }
-  }
+  .arrow-line { fill: none; stroke: #c9d1d9; stroke-width: 1.5; }
+  .arrow-line.flow { stroke: #56d364; }
+  .arrow-line.cross { stroke: #f0883e; stroke-width: 2; }
+  .arrow-line.flow.animated { stroke-dasharray: 6 6; animation: dashmove 1s linear infinite; }
+  @keyframes dashmove { to { stroke-dashoffset: -24; } }
 
-  /* Info card (right-floating) */
+  /* === Info card === */
   .info-card {
     position: absolute;
     top: 20px;
@@ -332,52 +198,11 @@
     z-index: 5;
     backdrop-filter: blur(10px);
   }
-  .info-card h2 {
-    font-size: 13px;
-    color: #f0883e;
-    margin-bottom: 6px;
-  }
-  .info-card .desc {
-    font-size: 12px;
-    color: #c9d1d9;
-    line-height: 1.5;
-  }
-  .info-card .shape-row {
-    margin-top: 8px;
-    padding: 6px 10px;
-    background: #0d1117;
-    border-radius: 4px;
-    font-family: monospace;
-    font-size: 11px;
-    color: #7ee787;
-  }
-  .info-card .formula {
-    margin-top: 8px;
-    padding: 6px 10px;
-    background: #0d1117;
-    border-left: 2px solid #58a6ff;
-    font-family: monospace;
-    font-size: 11px;
-    color: #c9d1d9;
-  }
+  .info-card h2 { font-size: 13px; color: #f0883e; margin-bottom: 6px; }
+  .info-card .desc { font-size: 12px; color: #c9d1d9; line-height: 1.5; }
+  .info-card .shape-row { margin-top: 8px; padding: 6px 10px; background: #0d1117; border-radius: 4px; font-family: monospace; font-size: 11px; color: #7ee787; }
+  .info-card .formula { margin-top: 8px; padding: 6px 10px; background: #0d1117; border-left: 2px solid #58a6ff; font-family: monospace; font-size: 11px; color: #c9d1d9; white-space: pre-wrap; }
 
-  /* Hint */
-  .hint {
-    position: absolute;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 8px 16px;
-    background: rgba(22, 27, 34, 0.9);
-    border: 1px solid #30363d;
-    border-radius: 20px;
-    font-size: 11px;
-    color: #8b949e;
-    pointer-events: none;
-    z-index: 5;
-  }
-
-  /* Stats overlay */
   .stats {
     position: absolute;
     top: 20px;
@@ -393,6 +218,22 @@
   .stats div { padding: 1px 0; }
   .stats .key { color: #6e7681; }
   .stats .val { color: #7ee787; }
+
+  .hint {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 6px 14px;
+    background: rgba(22, 27, 34, 0.9);
+    border: 1px solid #30363d;
+    border-radius: 20px;
+    font-size: 11px;
+    color: #8b949e;
+    pointer-events: none;
+    z-index: 5;
+  }
+  code { background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 3px; font-family: "SF Mono", Menlo, monospace; color: #f0883e; font-size: 11px; }
 </style>
 </head>
 <body>
@@ -401,7 +242,7 @@
 
   <aside class="sidebar">
     <h1>Transformer 2.5D</h1>
-    <div class="sub">Kéo chuột để xoay scene • Click slab để xem chi tiết</div>
+    <div class="sub">Theo phong cách paper <i>Attention is All You Need</i> — click block để xem chi tiết</div>
 
     <div class="group">
       <div class="group-title">Input</div>
@@ -442,13 +283,13 @@
     </div>
 
     <div class="group">
-      <div class="group-title">Layers</div>
+      <div class="group-title">Layers (Nx)</div>
       <div class="control">
-        <div class="control-label"><span class="name">encoder layers</span><span class="value" id="enc-layers-val">2</span></div>
+        <div class="control-label"><span class="name">encoder Nx</span><span class="value" id="enc-layers-val">2</span></div>
         <input type="range" id="enc-layers" min="1" max="6" value="2">
       </div>
       <div class="control">
-        <div class="control-label"><span class="name">decoder layers</span><span class="value" id="dec-layers-val">2</span></div>
+        <div class="control-label"><span class="name">decoder Nx</span><span class="value" id="dec-layers-val">2</span></div>
         <input type="range" id="dec-layers" min="1" max="6" value="2">
       </div>
     </div>
@@ -466,26 +307,17 @@
 
     <div class="group">
       <div class="group-title">View</div>
-      <div class="control">
-        <div class="control-label"><span class="name">tilt X</span><span class="value" id="rotx-val">-15°</span></div>
-        <input type="range" id="rot-x" min="-60" max="20" value="-15">
-      </div>
-      <div class="control">
-        <div class="control-label"><span class="name">spin Z</span><span class="value" id="rotz-val">0°</span></div>
-        <input type="range" id="rot-z" min="-45" max="45" value="0">
-      </div>
-      <div class="control">
-        <div class="control-label"><span class="name">spacing</span><span class="value" id="spacing-val">160</span></div>
-        <input type="range" id="spacing" min="80" max="280" value="160">
-      </div>
+      <label class="checkbox"><input type="checkbox" id="show-residual" checked> Residual arrows</label>
+      <label class="checkbox"><input type="checkbox" id="show-cross" checked> Cross-attention arrows</label>
       <label class="checkbox"><input type="checkbox" id="show-flow" checked> Animate flow</label>
-      <label class="checkbox"><input type="checkbox" id="show-shapes" checked> Show tensor shapes</label>
-      <button class="action secondary" id="reset-view">Reset view</button>
+      <label class="checkbox"><input type="checkbox" id="show-shapes"> Show tensor shapes</label>
+      <label class="checkbox"><input type="checkbox" id="tilt-3d" checked> 2.5D tilt</label>
+      <button class="action" id="reset-view">Reset</button>
     </div>
 
     <div class="group">
       <div class="group-title">Output (mô phỏng)</div>
-      <div style="font-size:12px;color:#c9d1d9;line-height:1.6;" id="output-preview">
+      <div style="font-size:12px;color:#c9d1d9;line-height:1.6;">
         Predicted: <span style="color:#56d364" id="pred-tokens">[6, 5, 4, 3]</span>
       </div>
     </div>
@@ -494,13 +326,26 @@
   <div class="scene-wrap" id="scene-wrap">
     <div class="stats" id="stats"></div>
     <div class="info-card" id="info-card">
-      <h2>Click vào slab bên trái để xem chi tiết</h2>
-      <div class="desc">Mỗi slab là một bước trong forward pass. Hover để highlight, click để focus và xem mô tả + công thức.</div>
+      <h2>Click block bên trái để xem chi tiết</h2>
+      <div class="desc">Diagram theo paper "Attention Is All You Need" (Vaswani et al., 2017). Encoder (trái) đọc src thành memory. Decoder (phải) sinh tgt autoregressive, dùng memory qua cross-attention. Nx = số layer xếp chồng.</div>
     </div>
-    <div class="stage">
-      <div class="world" id="world"></div>
+    <div class="diagram" id="diagram">
+      <svg class="arrows-svg" id="arrows" preserveAspectRatio="none">
+        <defs>
+          <marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#c9d1d9"/>
+          </marker>
+          <marker id="arrowhead-cross" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#f0883e"/>
+          </marker>
+          <marker id="arrowhead-flow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#56d364"/>
+          </marker>
+        </defs>
+      </svg>
+      <div class="diagram-inner" id="diagram-inner"></div>
     </div>
-    <div class="hint">Kéo chuột để xoay • Lăn chuột để zoom • Đổi params bên trái để rebuild</div>
+    <div class="hint">Click block bất kỳ để xem mô tả · đổi params bên trái để rebuild</div>
   </div>
 
 </div>
@@ -518,478 +363,465 @@ const state = {
   enc_layers: 2,
   dec_layers: 2,
   task: 'reverse',
-  rot_x: -15,
-  rot_z: 0,
-  zoom: 1,
-  auto_fit: true,
-  total_width: 0,
-  spacing: 160,
+  show_residual: true,
+  show_cross: true,
   show_flow: true,
-  show_shapes: true,
+  show_shapes: false,
+  tilt_3d: true,
   focused_id: null,
 };
 
-const PAD = 0, SOS = 1, EOS = 2;
-
-// Token palette (color per token id; use HSL hash)
+const VOCAB = 15;
 function tokenColor(id) {
-  if (id === PAD) return '#21262d';
-  if (id === SOS || id === EOS) return '#6e7681';
+  if (id === 0) return '#21262d';
+  if (id === 1 || id === 2) return '#6e7681';
   const hue = (id * 47) % 360;
   return `hsl(${hue}, 65%, 55%)`;
 }
 
-function tokenLabel(id) {
-  if (id === PAD) return 'PAD';
-  if (id === SOS) return 'SOS';
-  if (id === EOS) return 'EOS';
-  return String(id);
-}
-
-// ============================================================================
-// Compute output based on task
-// ============================================================================
 function computeTarget(src, task) {
   if (task === 'reverse') return [...src].reverse();
   if (task === 'sort') return [...src].sort((a, b) => a - b);
-  return [...src];   // copy
+  return [...src];
 }
 
 // ============================================================================
-// Slab builders — each returns { html, height, width, title, info }
+// Block descriptors (for info card on click)
 // ============================================================================
-
-function slabInput() {
-  const html = `<div class="slab-plate">
-    <div class="slab-title">Input tokens (src)</div>
-    <div class="slab-content">
-      <div class="token-row">
-        ${state.src.map((id, i) => `
-          <div class="token-box" style="background:${tokenColor(id)}">${tokenLabel(id)}</div>
-        `).join('')}
-      </div>
-      ${state.show_shapes ? `<div class="slab-shape">(1, ${state.seq_len})</div>` : ''}
-    </div>
-  </div>`;
-  return {
-    html, type: 'input',
-    title: 'Input tokens',
-    desc: 'Chuỗi token ID nguyên dương. Token đặc biệt: 0=PAD, 1=SOS, 2=EOS. Còn lại là vocab thực.',
-    shape: `src.shape = (batch=1, seq_len=${state.seq_len})`,
-    formula: 'src ∈ ℕ^(B × L)',
+function describe(type, ctx) {
+  const dk = state.d_model / state.num_heads;
+  const tbl = {
+    'embed-in': {
+      title: 'Input Embedding',
+      desc: 'Lookup vector cho mỗi token ID. Nhân √d_model theo paper.',
+      shape: `(B, L_src, ${state.d_model})`,
+      formula: 'E = Embed(src) × √d_model',
+    },
+    'embed-out': {
+      title: 'Output Embedding',
+      desc: 'Embedding cho tgt (decoder input). Cũng nhân √d_model.',
+      shape: `(B, L_tgt, ${state.d_model})`,
+      formula: 'E_out = Embed(tgt[:-1]) × √d_model',
+    },
+    'pe': {
+      title: 'Positional Encoding',
+      desc: 'Sin/cos pattern cố định cộng vào embedding để encode vị trí.',
+      shape: `(B, L, ${state.d_model})`,
+      formula: 'PE(pos,2i)   = sin(pos / 10000^(2i/d))\nPE(pos,2i+1) = cos(pos / 10000^(2i/d))',
+    },
+    'mha-enc': {
+      title: `Multi-Head Attention (encoder, layer ${ctx})`,
+      desc: `${state.num_heads} head song song, mỗi head ${dk}-d. Q=K=V đều từ encoder hidden. Token trong src attend lẫn nhau.`,
+      shape: `(B, L_src, ${state.d_model})`,
+      formula: 'Attn(Q,K,V) = softmax(QKᵀ/√d_k) V',
+    },
+    'mha-masked': {
+      title: `Masked Multi-Head Attention (decoder, layer ${ctx})`,
+      desc: 'Causal mask: token tại pos i chỉ attend ≤ i. Ngăn nhìn trộm tương lai khi train.',
+      shape: `(B, L_tgt, ${state.d_model})`,
+      formula: 'mask[i,j] = -∞ if j > i else 0',
+    },
+    'mha-cross': {
+      title: `Cross-Attention (decoder, layer ${ctx})`,
+      desc: `Q từ decoder, K & V từ encoder memory. ${
+        state.task === 'reverse' ? 'Cho reverse: học attend ngược (pos cuối src ↔ pos đầu tgt).'
+        : state.task === 'sort' ? 'Cho sort: học attend "min chưa sinh".'
+        : 'Cho copy: học attend đúng cùng vị trí.'
+      }`,
+      shape: `Q: (B, L_tgt, ${state.d_model}); K,V: (B, L_src, ${state.d_model})`,
+      formula: 'CrossAttn(Q_dec, K_mem, V_mem)',
+    },
+    'ffn': {
+      title: `Feed-Forward (${ctx})`,
+      desc: `Mở rộng ${state.d_model} → ${state.d_ff}, ReLU, chiếu về ${state.d_model}. Áp dụng độc lập từng vị trí.`,
+      shape: `(B, L, ${state.d_model})`,
+      formula: 'FFN(x) = ReLU(xW₁ + b₁) W₂ + b₂',
+    },
+    'addnorm': {
+      title: 'Add & Norm',
+      desc: 'Residual connection (x + sublayer(x)) rồi LayerNorm. Giúp train mạng sâu ổn định.',
+      shape: 'unchanged',
+      formula: 'LayerNorm(x + Sublayer(x))',
+    },
+    'linear': {
+      title: 'Linear (output projection)',
+      desc: `Chiếu hidden ${state.d_model} → vocab_size (${VOCAB}).`,
+      shape: `(B, L_tgt, ${VOCAB})`,
+      formula: 'logits = h W_out + b_out',
+    },
+    'softmax': {
+      title: 'Softmax',
+      desc: 'Đưa logits về phân phối xác suất trên vocab. Argmax = token kế tiếp.',
+      shape: `(B, L_tgt, ${VOCAB})`,
+      formula: 'p_i = exp(logit_i) / Σⱼ exp(logit_j)',
+    },
   };
+  return tbl[type] || { title: type, desc: '', shape: '', formula: '' };
 }
 
-function slabEmbedding() {
-  const cols = 16;
-  const rows = state.seq_len;
-  const cellSize = 12;
-  const cells = [];
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const seed = (state.src[r] * 97 + c * 31) & 0xff;
-      const hue = (seed * 1.4 + state.src[r] * 47) % 360;
-      cells.push(`<div class="matrix-cell" style="background:hsl(${hue},60%,${30 + (seed % 30)}%)"></div>`);
-    }
-  }
-  const html = `<div class="slab-plate">
-    <div class="slab-title">Embedding × √d_model</div>
-    <div class="slab-content">
-      <div class="matrix-grid" style="grid-template-columns:repeat(${cols},${cellSize}px);">
-        ${cells.join('')}
-      </div>
-      ${state.show_shapes ? `<div class="slab-shape">(1, ${state.seq_len}, ${state.d_model})</div>` : ''}
-    </div>
-  </div>`;
-  return {
-    html, type: 'embedding',
-    title: 'Embedding',
-    desc: `Mỗi token ID → vector ${state.d_model}-d. Nhân √${state.d_model} ≈ ${Math.sqrt(state.d_model).toFixed(2)}. Grid hiển thị nén ${cols} cột (thực tế ${state.d_model}).`,
-    shape: `(1, ${state.seq_len}, ${state.d_model})`,
-    formula: 'E = Embed(src) × √d_model',
-  };
-}
-
-function slabPosEnc() {
-  // Visualize as wave overlay on grid
-  const cols = 16;
-  const rows = state.seq_len;
-  const cells = [];
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const isEven = c % 2 === 0;
-      const angle = r / Math.pow(10000, c / state.d_model);
-      const val = isEven ? Math.sin(angle) : Math.cos(angle);
-      const intensity = Math.round((val + 1) * 127);
-      cells.push(`<div class="matrix-cell" style="background:rgba(88,166,255,${(val + 1) / 2})"></div>`);
-    }
-  }
-  const html = `<div class="slab-plate">
-    <div class="slab-title">+ Positional Encoding</div>
-    <div class="slab-content">
-      <div class="matrix-grid" style="grid-template-columns:repeat(${cols},12px);">
-        ${cells.join('')}
-      </div>
-      ${state.show_shapes ? `<div class="slab-shape">(1, ${state.seq_len}, ${state.d_model})</div>` : ''}
-    </div>
-  </div>`;
-  return {
-    html, type: 'posenc',
-    title: 'Positional Encoding',
-    desc: 'Cộng sin/cos pattern theo vị trí. Cho phép model phân biệt thứ tự token. Pattern cố định, không học.',
-    shape: `(1, ${state.seq_len}, ${state.d_model})`,
-    formula: 'PE(pos, 2i)   = sin(pos / 10000^(2i/d))\nPE(pos, 2i+1) = cos(pos / 10000^(2i/d))',
-  };
-}
-
-function slabAttention(layerIdx, kind) {
-  // kind: 'self-enc' | 'self-dec-masked' | 'cross'
-  const seqQ = (kind === 'cross') ? 1 : state.seq_len;
-  const seqK = state.seq_len;
-  const headBlocks = Math.min(state.num_heads, 8);
-  const headBlockSize = 8;
-  const headHtml = [];
-  for (let h = 0; h < headBlocks; h++) {
-    const cellsPerHead = [];
-    for (let i = 0; i < seqQ; i++) {
-      for (let j = 0; j < seqK; j++) {
-        let w;
-        // Pattern depends on task & kind
-        if (kind === 'self-enc') {
-          w = (i === j) ? 0.5 : 0.1 + 0.3 * Math.exp(-Math.abs(i - j) * 0.5);
-        } else if (kind === 'self-dec-masked') {
-          w = (j <= i) ? (i === j ? 0.6 : 0.2) : 0;
-        } else { // cross
-          if (state.task === 'reverse') {
-            // attend opposite end
-            w = (j === seqK - 1) ? 0.7 : 0.1;
-          } else if (state.task === 'sort') {
-            // attend min (just visualize: first src for simplicity)
-            w = (j === 0) ? 0.6 : 0.15;
-          } else {
-            w = (j === i) ? 0.7 : 0.1;
-          }
-        }
-        const alpha = Math.max(0.05, w);
-        cellsPerHead.push(`<div style="background:rgba(${kind === 'cross' ? '86,211,100' : '88,166,255'},${alpha})"></div>`);
-      }
-    }
-    headHtml.push(`<div class="head-mini" style="grid-template-columns:repeat(${seqK},${headBlockSize}px);grid-auto-rows:${headBlockSize}px;">${cellsPerHead.join('')}</div>`);
-  }
-
-  const title = kind === 'self-enc' ? `Enc L${layerIdx}: Self-Attn`
-              : kind === 'self-dec-masked' ? `Dec L${layerIdx}: Masked Self-Attn`
-              : `Dec L${layerIdx}: Cross-Attn`;
-  const shape = `(1, ${seqQ}, ${state.d_model})`;
-  const descMap = {
-    'self-enc': `${state.num_heads} head song song, mỗi head ${state.d_model / state.num_heads}-d. Token trong src attend lẫn nhau.`,
-    'self-dec-masked': 'Causal mask: token tại pos i chỉ attend ≤ i. Ngăn nhìn trộm tương lai khi train.',
-    'cross': `Q từ decoder, K/V từ encoder memory. ${state.task === 'reverse' ? 'Học attend ngược (pos cuối src ↔ pos đầu tgt).' : state.task === 'sort' ? 'Học attend "min chưa sinh".' : 'Attend cùng vị trí.'}`,
-  };
-
-  const html = `<div class="slab-plate">
-    <div class="slab-title">${title} (${state.num_heads} heads)</div>
-    <div class="slab-content">
-      <div class="heads-stack">${headHtml.join('')}</div>
-      ${state.show_shapes ? `<div class="slab-shape">${shape}</div>` : ''}
-    </div>
-  </div>`;
-  return {
-    html, type: kind,
-    title,
-    desc: descMap[kind],
-    shape,
-    formula: 'Attn(Q,K,V) = softmax(QKᵀ/√d_k) V',
-  };
-}
-
-function slabFFN(layerIdx, side) {
-  const html = `<div class="slab-plate">
-    <div class="slab-title">${side === 'enc' ? 'Enc' : 'Dec'} L${layerIdx}: FFN</div>
-    <div class="slab-content">
-      <div class="ffn-vis">
-        <div class="ffn-block">${state.d_model}</div>
-        <span style="color:#6e7681;font-size:9px;">→ReLU→</span>
-        <div class="ffn-block wide" style="min-width:${Math.min(80, state.d_ff / 8)}px;">${state.d_ff}</div>
-        <span style="color:#6e7681;font-size:9px;">→</span>
-        <div class="ffn-block">${state.d_model}</div>
-      </div>
-      ${state.show_shapes ? `<div class="slab-shape">(1, ${side === 'cross' ? 1 : state.seq_len}, ${state.d_model})</div>` : ''}
-    </div>
-  </div>`;
-  return {
-    html, type: 'ffn',
-    title: 'Feed-Forward Network',
-    desc: `Mở rộng ${state.d_model} → ${state.d_ff}, ReLU, chiếu về ${state.d_model}. Áp dụng độc lập từng vị trí (không trộn giữa các token).`,
-    shape: `(1, *, ${state.d_model})`,
-    formula: 'FFN(x) = ReLU(xW₁ + b₁)W₂ + b₂',
-  };
-}
-
-function slabOutput() {
-  const vocabSize = 15;
-  const target = computeTarget(state.src, state.task);
-  const targetTok = target[0] !== undefined ? target[0] : 3;
-  const probs = [];
-  for (let i = 0; i < vocabSize; i++) {
-    const d = Math.abs(i - targetTok);
-    probs.push(Math.exp(-d * d / 1.5));
-  }
-  const sum = probs.reduce((a, b) => a + b, 0);
-  const max = Math.max(...probs);
-  const bars = probs.map((p, i) => {
-    const isWinner = i === targetTok;
-    return `<div class="vocab-bar-3d ${isWinner ? 'winner' : ''}" style="height:${(p / max) * 100}%"></div>`;
-  }).join('');
-  const html = `<div class="slab-plate">
-    <div class="slab-title">Linear → Softmax (vocab=${vocabSize})</div>
-    <div class="slab-content">
-      <div class="vocab-bars-3d">${bars}</div>
-      <div style="margin-top:6px;font-size:10px;color:#56d364;">argmax → ${tokenLabel(targetTok)}</div>
-      ${state.show_shapes ? `<div class="slab-shape">(1, 1, ${vocabSize})</div>` : ''}
-    </div>
-  </div>`;
-  return {
-    html, type: 'output',
-    title: 'Output projection',
-    desc: 'Linear chiếu d_model → vocab_size. Softmax cho phân phối. Argmax = token kế tiếp được sinh.',
-    shape: `(1, 1, ${vocabSize})`,
-    formula: 'p = softmax(W_out · h + b_out)',
-  };
-}
-
-function slabPredicted() {
-  const target = computeTarget(state.src, state.task);
-  const html = `<div class="slab-plate" style="border-color:#56d364;">
-    <div class="slab-title" style="color:#56d364;">Predicted (autoregressive)</div>
-    <div class="slab-content">
-      <div class="token-row">
-        ${target.map(id => `
-          <div class="token-box" style="background:${tokenColor(id)}">${tokenLabel(id)}</div>
-        `).join('')}
-        <div class="token-box" style="background:#6e7681;color:#e6edf3">EOS</div>
-      </div>
-      ${state.show_shapes ? `<div class="slab-shape">${state.task}: ${JSON.stringify(state.src)} → ${JSON.stringify(target)}</div>` : ''}
-    </div>
-  </div>`;
-  return {
-    html, type: 'predicted',
-    title: 'Final output',
-    desc: `Token sinh autoregressive đến khi gặp EOS. Task = ${state.task}.`,
-    shape: `output = ${JSON.stringify(target)}`,
-    formula: 'while not EOS: y_t = argmax decode(y_{<t}, memory)',
-  };
+function focusBox(el, type, ctx) {
+  document.querySelectorAll('.box.focused').forEach(b => b.classList.remove('focused'));
+  el.classList.add('focused');
+  const info = describe(type, ctx);
+  document.getElementById('info-card').innerHTML = `
+    <h2>${info.title}</h2>
+    <div class="desc">${info.desc}</div>
+    <div class="shape-row">${info.shape}</div>
+    <div class="formula">${info.formula}</div>
+  `;
 }
 
 // ============================================================================
-// Build & layout
+// Build diagram
 // ============================================================================
-function buildScene() {
-  const world = document.getElementById('world');
-  world.innerHTML = '';
+function makeBox(label, cls, type, ctx, smallText) {
+  const div = document.createElement('div');
+  div.className = `box ${cls}`;
+  div.dataset.type = type;
+  div.dataset.ctx = ctx || '';
+  div.innerHTML = `${label}${smallText ? `<span class="small">${smallText}</span>` : ''}`;
+  div.addEventListener('click', e => { e.stopPropagation(); focusBox(div, type, ctx); });
+  return div;
+}
 
-  const slabs = [];
-  slabs.push(slabInput());
-  slabs.push(slabEmbedding());
-  slabs.push(slabPosEnc());
-  // Encoder stack
+function buildPE(side) {
+  const div = document.createElement('div');
+  div.className = 'pe';
+  div.innerHTML = `
+    <span class="pe-label">Positional<br>Encoding</span>
+    <div class="pe-sin"><svg viewBox="0 0 30 30"><path d="M2,15 Q9,2 15,15 T28,15" stroke="#c9d1d9" stroke-width="1.5" fill="none"/></svg></div>
+    <div class="pe-circle">⊕</div>
+  `;
+  return div;
+}
+
+function buildEncoderColumn() {
+  const col = document.createElement('div');
+  col.className = 'col enc';
+
+  // From bottom up: Input Embedding → PE → (MHA → A&N → FFN → A&N) × N
+  const group = document.createElement('div');
+  group.className = 'layer-group enc-group';
+
+  // Layer block: Multi-Head Attention → Add&Norm → FFN → Add&Norm (one unit per N)
   for (let l = 1; l <= state.enc_layers; l++) {
-    slabs.push(slabAttention(l, 'self-enc'));
-    slabs.push(slabFFN(l, 'enc'));
-  }
-  // Memory marker
-  slabs.push({
-    html: `<div class="slab-plate" style="border-color:#a371f7;">
-      <div class="slab-title" style="color:#a371f7;">→ Memory (encoder output)</div>
-      <div class="slab-content" style="padding:4px 0;font-size:10px;color:#8b949e;">
-        Truyền cho mọi decoder layer qua cross-attention
-        ${state.show_shapes ? `<div class="slab-shape">(1, ${state.seq_len}, ${state.d_model})</div>` : ''}
-      </div>
-    </div>`,
-    type: 'memory',
-    title: 'Memory',
-    desc: 'Output cuối encoder. Mọi decoder layer dùng cùng tensor này làm K, V cho cross-attention.',
-    shape: `(1, ${state.seq_len}, ${state.d_model})`,
-    formula: 'memory = encoder(src)',
-  });
-  // Decoder stack
-  for (let l = 1; l <= state.dec_layers; l++) {
-    slabs.push(slabAttention(l, 'self-dec-masked'));
-    slabs.push(slabAttention(l, 'cross'));
-    slabs.push(slabFFN(l, 'dec'));
-  }
-  slabs.push(slabOutput());
-  slabs.push(slabPredicted());
-
-  const spacing = state.spacing;
-  const totalW = (slabs.length - 1) * spacing;
-  const offsetX = -totalW / 2;
-  state.total_width = totalW + 320;   // +320 ≈ slab content width, for auto-fit
-
-  slabs.forEach((slab, idx) => {
-    const x = offsetX + idx * spacing;
-    const div = document.createElement('div');
-    div.className = 'slab';
-    div.dataset.id = idx;
-    div.style.transform = `translate(-50%, -50%) translateX(${x}px)`;
-    div.innerHTML = slab.html;
-    div.addEventListener('click', (e) => {
-      e.stopPropagation();
-      focusSlab(idx, slab);
-    });
-    world.appendChild(div);
-
-    // Connector pillar between slabs (horizontal line along X)
-    if (idx < slabs.length - 1) {
-      const pillar = document.createElement('div');
-      pillar.className = 'pillar' + (state.show_flow ? ' flow' : '');
-      pillar.style.transform = `translate(-50%, -50%) translateX(${x + spacing / 2}px)`;
-      pillar.style.width = (spacing - 40) + 'px';
-      world.appendChild(pillar);
+    if (l > 1) {
+      const sep = document.createElement('div');
+      sep.style.height = '12px';
+      group.appendChild(sep);
     }
-  });
+    const mha = makeBox('Multi-Head<br>Attention', 'box-attn', 'mha-enc', l, state.show_shapes ? `(B, L_src, ${state.d_model})` : null);
+    mha.dataset.role = 'mha';
+    mha.dataset.layer = l;
+    const an1 = makeBox('Add & Norm', 'box-addnorm', 'addnorm', `enc L${l} after MHA`);
+    an1.dataset.role = 'an1';
+    an1.dataset.layer = l;
+    const ffn = makeBox('Feed<br>Forward', 'box-ffn', 'ffn', `enc L${l}`, state.show_shapes ? `${state.d_model} → ${state.d_ff} → ${state.d_model}` : null);
+    ffn.dataset.role = 'ffn';
+    ffn.dataset.layer = l;
+    const an2 = makeBox('Add & Norm', 'box-addnorm', 'addnorm', `enc L${l} after FFN`);
+    an2.dataset.role = 'an2';
+    an2.dataset.layer = l;
+    group.appendChild(mha);
+    group.appendChild(an1);
+    group.appendChild(ffn);
+    group.appendChild(an2);
+  }
 
-  updateStats(slabs.length);
-  applyView();
+  const nx = document.createElement('div');
+  nx.className = 'nx-label';
+  nx.textContent = `${state.enc_layers}×`;
+  group.appendChild(nx);
+
+  col.appendChild(group);
+  col.appendChild(buildPE('enc'));
+  col.appendChild(makeBox('Input<br>Embedding', 'box-embed', 'embed-in'));
+  const lbl = document.createElement('div');
+  lbl.className = 'io-label';
+  lbl.innerHTML = 'Inputs <small>(src)</small>';
+  col.appendChild(lbl);
+
+  // top → bottom in DOM, but visually we want bottom→up. Use flex column-reverse via wrapping.
+  reverseColumn(col);
+  return col;
 }
 
-function focusSlab(idx, slab) {
-  document.querySelectorAll('.slab').forEach(el => el.classList.remove('focused'));
-  const target = document.querySelector(`.slab[data-id="${idx}"]`);
-  if (target) target.classList.add('focused');
-  state.focused_id = idx;
-  const card = document.getElementById('info-card');
-  card.innerHTML = `
-    <h2>${slab.title}</h2>
-    <div class="desc">${slab.desc}</div>
-    <div class="shape-row">${slab.shape}</div>
-    <div class="formula">${slab.formula}</div>
-  `;
+function buildDecoderColumn() {
+  const col = document.createElement('div');
+  col.className = 'col dec';
+
+  const group = document.createElement('div');
+  group.className = 'layer-group dec-group';
+
+  for (let l = 1; l <= state.dec_layers; l++) {
+    if (l > 1) {
+      const sep = document.createElement('div');
+      sep.style.height = '12px';
+      group.appendChild(sep);
+    }
+    const mhaM = makeBox('Masked<br>Multi-Head<br>Attention', 'box-attn masked', 'mha-masked', l);
+    mhaM.dataset.role = 'mha-masked';
+    mhaM.dataset.layer = l;
+    const an1 = makeBox('Add & Norm', 'box-addnorm', 'addnorm', `dec L${l} after masked`);
+    an1.dataset.role = 'an1';
+    an1.dataset.layer = l;
+    const mhaC = makeBox('Multi-Head<br>Attention', 'box-attn', 'mha-cross', l, state.show_shapes ? `cross K,V ← enc` : null);
+    mhaC.dataset.role = 'mha-cross';
+    mhaC.dataset.layer = l;
+    const an2 = makeBox('Add & Norm', 'box-addnorm', 'addnorm', `dec L${l} after cross`);
+    an2.dataset.role = 'an2';
+    an2.dataset.layer = l;
+    const ffn = makeBox('Feed<br>Forward', 'box-ffn', 'ffn', `dec L${l}`);
+    ffn.dataset.role = 'ffn';
+    ffn.dataset.layer = l;
+    const an3 = makeBox('Add & Norm', 'box-addnorm', 'addnorm', `dec L${l} after FFN`);
+    an3.dataset.role = 'an3';
+    an3.dataset.layer = l;
+    group.appendChild(mhaM);
+    group.appendChild(an1);
+    group.appendChild(mhaC);
+    group.appendChild(an2);
+    group.appendChild(ffn);
+    group.appendChild(an3);
+  }
+
+  const nx = document.createElement('div');
+  nx.className = 'nx-label';
+  nx.textContent = `${state.dec_layers}×`;
+  group.appendChild(nx);
+
+  col.appendChild(makeBox('Softmax', 'box-softmax', 'softmax'));
+  col.appendChild(makeBox('Linear', 'box-linear', 'linear'));
+  col.appendChild(group);
+  col.appendChild(buildPE('dec'));
+  col.appendChild(makeBox('Output<br>Embedding', 'box-embed', 'embed-out'));
+  const lbl = document.createElement('div');
+  lbl.className = 'io-label';
+  lbl.innerHTML = 'Outputs <small>(shifted right)</small>';
+  col.appendChild(lbl);
+
+  reverseColumn(col);
+  return col;
 }
 
-function updateStats(numSlabs) {
-  const params = estimateParams();
-  document.getElementById('stats').innerHTML = `
-    <div><span class="key">slabs:</span> <span class="val">${numSlabs}</span></div>
-    <div><span class="key">params:</span> <span class="val">~${formatParams(params)}</span></div>
-    <div><span class="key">d_k:</span> <span class="val">${state.d_model / state.num_heads}</span></div>
-    <div><span class="key">view:</span> <span class="val">X=${state.rot_x}° Z=${state.rot_z}°</span></div>
-  `;
+function reverseColumn(col) {
+  // Reverse child order so bottom items appear at bottom visually.
+  const children = Array.from(col.children);
+  children.reverse().forEach(c => col.appendChild(c));
 }
 
+function buildDiagram() {
+  const inner = document.getElementById('diagram-inner');
+  inner.innerHTML = '';
+  inner.appendChild(buildEncoderColumn());
+  inner.appendChild(buildDecoderColumn());
+
+  requestAnimationFrame(drawArrows);
+  updateStats();
+  updatePred();
+}
+
+// ============================================================================
+// Draw SVG arrows (residual + cross-attention + main flow)
+// ============================================================================
+function drawArrows() {
+  const svg = document.getElementById('arrows');
+  // clear existing dynamic content (keep <defs>)
+  Array.from(svg.querySelectorAll('path, line')).forEach(n => n.remove());
+
+  const diagram = document.getElementById('diagram');
+  const dRect = diagram.getBoundingClientRect();
+  svg.setAttribute('width', dRect.width);
+  svg.setAttribute('height', dRect.height);
+  svg.setAttribute('viewBox', `0 0 ${dRect.width} ${dRect.height}`);
+
+  function center(el) {
+    const r = el.getBoundingClientRect();
+    return {
+      x: r.left - dRect.left + r.width / 2,
+      y: r.top - dRect.top + r.height / 2,
+      top: r.top - dRect.top,
+      bottom: r.bottom - dRect.top,
+      left: r.left - dRect.left,
+      right: r.right - dRect.left,
+      w: r.width,
+      h: r.height,
+    };
+  }
+
+  function arrow(d, cls = '') {
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', d);
+    p.setAttribute('class', `arrow-line ${cls} ${state.show_flow && cls === 'flow' ? 'animated' : ''}`);
+    if (cls === 'cross') p.setAttribute('marker-end', 'url(#arrowhead-cross)');
+    else if (cls === 'flow') p.setAttribute('marker-end', 'url(#arrowhead-flow)');
+    else p.setAttribute('marker-end', 'url(#arrowhead)');
+    svg.appendChild(p);
+  }
+
+  // For each column, draw vertical flow lines connecting consecutive blocks.
+  // For each layer, draw residual loops around MHA / FFN / etc.
+
+  function drawColumnFlow(col) {
+    // Find all boxes (skip layer-group wrapper — children are also boxes within)
+    const allBoxes = Array.from(col.querySelectorAll('.box, .pe'));
+    // Sort by top position descending → bottom-up flow
+    allBoxes.sort((a, b) => b.getBoundingClientRect().top - a.getBoundingClientRect().top);
+    for (let i = 0; i < allBoxes.length - 1; i++) {
+      const from = center(allBoxes[i]);
+      const to = center(allBoxes[i + 1]);
+      // Vertical arrow upward (since we sorted bottom-first)
+      arrow(`M ${from.x} ${from.top} L ${to.x} ${to.bottom + 2}`, 'flow');
+    }
+  }
+
+  if (state.show_flow !== false) {
+    document.querySelectorAll('.col').forEach(c => drawColumnFlow(c));
+  }
+
+  // Residual connections — curved around each sub-block + its Add&Norm
+  if (state.show_residual) {
+    document.querySelectorAll('.layer-group').forEach(grp => {
+      const isEnc = grp.classList.contains('enc-group');
+      const numLayers = isEnc ? state.enc_layers : state.dec_layers;
+      for (let l = 1; l <= numLayers; l++) {
+        // For each sublayer, draw arrow from BEFORE sublayer to its Add&Norm
+        const subs = isEnc
+          ? [['mha', 'an1'], ['ffn', 'an2']]
+          : [['mha-masked', 'an1'], ['mha-cross', 'an2'], ['ffn', 'an3']];
+        // The "before" point for the first sublayer of a layer is the bottom of:
+        //   - PE block if layer 1
+        //   - previous layer's last Add&Norm otherwise
+        // We'll just take the bottom of the sublayer's input box.
+        subs.forEach(([role, anRole], idx) => {
+          const sub = grp.querySelector(`[data-role="${role}"][data-layer="${l}"]`);
+          const an = grp.querySelector(`[data-role="${anRole}"][data-layer="${l}"]`);
+          if (!sub || !an) return;
+          const subC = center(sub);
+          const anC = center(an);
+          // Residual goes from "input of sublayer" (which is below sub) curved up to add&norm
+          const startX = subC.left - 8;
+          const startY = subC.bottom;
+          const endX = anC.left - 8;
+          const endY = anC.y;
+          const cx = startX - 40;
+          arrow(`M ${startX} ${startY} C ${cx} ${startY}, ${cx} ${endY}, ${endX} ${endY}`, '');
+        });
+      }
+    });
+  }
+
+  // Cross-attention arrows: from top of encoder group to cross-attn of each decoder layer
+  if (state.show_cross) {
+    const encGroup = document.querySelector('.enc-group');
+    if (encGroup) {
+      const encTopRect = encGroup.getBoundingClientRect();
+      const encTopX = encTopRect.right - dRect.left - 20;
+      const encTopY = encTopRect.top - dRect.top + 30;
+      // Vertical line up from top of encoder group, then branch right to each cross-attn
+      const decCrossList = document.querySelectorAll('.dec-group [data-role="mha-cross"]');
+      decCrossList.forEach(cross => {
+        const c = center(cross);
+        // Curve from (encTopX, encTopY) over to (c.left, c.y) — left side of cross box
+        arrow(`M ${encTopX} ${encTopY} C ${encTopX + 80} ${encTopY}, ${c.left - 80} ${c.y}, ${c.left - 2} ${c.y}`, 'cross');
+      });
+    }
+  }
+}
+
+// ============================================================================
+// Stats / output preview
+// ============================================================================
 function estimateParams() {
-  // very rough: each layer ~ 4*d^2 (attn) + 2*d*d_ff (ffn)
-  const dec = state.d_model;
-  const perEnc = 4 * dec * dec + 2 * dec * state.d_ff;
-  const perDec = 6 * dec * dec + 2 * dec * state.d_ff;  // 2 attn blocks
-  const vocab = 15;
-  const embed = vocab * dec * 2;
-  return embed + state.enc_layers * perEnc + state.dec_layers * perDec + dec * vocab;
+  const d = state.d_model;
+  const v = VOCAB;
+  const perEnc = 4 * d * d + 2 * d * state.d_ff;
+  const perDec = 6 * d * d + 2 * d * state.d_ff;
+  return v * d * 2 + state.enc_layers * perEnc + state.dec_layers * perDec + d * v;
 }
 function formatParams(n) {
   if (n > 1e6) return (n / 1e6).toFixed(2) + 'M';
   if (n > 1e3) return (n / 1e3).toFixed(1) + 'K';
-  return n.toString();
+  return String(n);
 }
-
-function applyView() {
-  const world = document.getElementById('world');
-  const wrap = document.getElementById('scene-wrap');
-  // Auto-fit horizontal: scale so the entire pipeline fits in the scene width.
-  const availW = Math.max(400, wrap.clientWidth - 80);
-  const fit = state.auto_fit ? Math.min(1.2, availW / (state.total_width || 1)) : 1;
-  const finalZoom = state.zoom * fit;
-  world.style.transform = `translate(-50%, -50%) scale(${finalZoom}) rotateX(${state.rot_x}deg) rotateY(-15deg) rotateZ(${state.rot_z}deg)`;
-  document.getElementById('rotx-val').textContent = Math.round(state.rot_x) + '°';
-  document.getElementById('rotz-val').textContent = Math.round(state.rot_z) + '°';
+function updateStats() {
+  document.getElementById('stats').innerHTML = `
+    <div><span class="key">d_model:</span> <span class="val">${state.d_model}</span></div>
+    <div><span class="key">heads:</span>   <span class="val">${state.num_heads}  (d_k=${state.d_model / state.num_heads})</span></div>
+    <div><span class="key">enc/dec:</span> <span class="val">${state.enc_layers} / ${state.dec_layers}</span></div>
+    <div><span class="key">params:</span>  <span class="val">~${formatParams(estimateParams())}</span></div>
+  `;
+}
+function updatePred() {
+  const t = computeTarget(state.src, state.task);
+  document.getElementById('pred-tokens').textContent = '[' + t.join(', ') + ']';
 }
 
 // ============================================================================
 // Controls
 // ============================================================================
 function setupControls() {
-  // Sliders
   document.getElementById('seq-len').addEventListener('input', e => {
     state.seq_len = parseInt(e.target.value);
-    // Resize src to seq_len
-    const tokens = [];
-    for (let i = 0; i < state.seq_len; i++) {
-      tokens.push(state.src[i] !== undefined ? state.src[i] : 3 + (i % 12));
-    }
-    state.src = tokens;
+    const t = [];
+    for (let i = 0; i < state.seq_len; i++) t.push(state.src[i] !== undefined ? state.src[i] : 3 + (i % 12));
+    state.src = t;
     document.getElementById('src-input').value = state.src.join(',');
     document.getElementById('src-display').textContent = '[' + state.src.join(',') + ']';
     document.getElementById('seq-len-val').textContent = state.seq_len;
-    updatePred();
-    buildScene();
+    buildDiagram();
   });
-
   document.getElementById('src-input').addEventListener('change', e => {
-    const tokens = e.target.value.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n >= 3 && n <= 14);
-    if (tokens.length === 0) return;
-    state.src = tokens;
-    state.seq_len = tokens.length;
+    const t = e.target.value.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n >= 3 && n <= 14);
+    if (!t.length) return;
+    state.src = t;
+    state.seq_len = t.length;
     document.getElementById('seq-len').value = state.seq_len;
     document.getElementById('seq-len-val').textContent = state.seq_len;
     document.getElementById('src-display').textContent = '[' + state.src.join(',') + ']';
-    updatePred();
-    buildScene();
+    buildDiagram();
   });
 
-  // d_model toggles (must keep num_heads valid)
   document.querySelectorAll('#d-model-toggles .toggle').forEach(t => {
     t.addEventListener('click', () => {
       document.querySelectorAll('#d-model-toggles .toggle').forEach(x => x.classList.remove('active'));
       t.classList.add('active');
       state.d_model = parseInt(t.dataset.val);
-      // Ensure heads divides d_model
       if (state.d_model % state.num_heads !== 0) {
-        state.num_heads = Math.min(state.d_model, 8);
-        // pick closest valid
         while (state.d_model % state.num_heads !== 0) state.num_heads--;
-        document.querySelectorAll('#heads-toggles .toggle').forEach(x => {
-          x.classList.toggle('active', parseInt(x.dataset.val) === state.num_heads);
-        });
+        document.querySelectorAll('#heads-toggles .toggle').forEach(x => x.classList.toggle('active', parseInt(x.dataset.val) === state.num_heads));
         document.getElementById('num-heads-val').textContent = state.num_heads;
       }
       document.getElementById('d-model-val').textContent = state.d_model;
-      buildScene();
+      buildDiagram();
     });
   });
-
-  // num_heads toggles
   document.querySelectorAll('#heads-toggles .toggle').forEach(t => {
     t.addEventListener('click', () => {
       const v = parseInt(t.dataset.val);
-      if (state.d_model % v !== 0) {
-        t.style.animation = 'none';
-        t.offsetHeight;
-        t.style.animation = 'shake 0.3s';
-        return;
-      }
+      if (state.d_model % v !== 0) return;
       document.querySelectorAll('#heads-toggles .toggle').forEach(x => x.classList.remove('active'));
       t.classList.add('active');
       state.num_heads = v;
       document.getElementById('num-heads-val').textContent = state.num_heads;
-      buildScene();
+      buildDiagram();
     });
   });
 
   document.getElementById('d-ff').addEventListener('input', e => {
     state.d_ff = parseInt(e.target.value);
     document.getElementById('d-ff-val').textContent = state.d_ff;
-    buildScene();
+    buildDiagram();
   });
-
   document.getElementById('enc-layers').addEventListener('input', e => {
     state.enc_layers = parseInt(e.target.value);
     document.getElementById('enc-layers-val').textContent = state.enc_layers;
-    buildScene();
+    buildDiagram();
   });
   document.getElementById('dec-layers').addEventListener('input', e => {
     state.dec_layers = parseInt(e.target.value);
     document.getElementById('dec-layers-val').textContent = state.dec_layers;
-    buildScene();
+    buildDiagram();
   });
 
   document.querySelectorAll('#task-toggles .toggle').forEach(t => {
@@ -998,100 +830,54 @@ function setupControls() {
       t.classList.add('active');
       state.task = t.dataset.val;
       updatePred();
-      buildScene();
     });
   });
 
-  document.getElementById('rot-x').addEventListener('input', e => {
-    state.rot_x = parseInt(e.target.value);
-    applyView();
-  });
-  document.getElementById('rot-z').addEventListener('input', e => {
-    state.rot_z = parseInt(e.target.value);
-    applyView();
-  });
-  document.getElementById('spacing').addEventListener('input', e => {
-    state.spacing = parseInt(e.target.value);
-    document.getElementById('spacing-val').textContent = state.spacing;
-    buildScene();
-  });
-
-  document.getElementById('show-flow').addEventListener('change', e => {
-    state.show_flow = e.target.checked;
-    buildScene();
-  });
-  document.getElementById('show-shapes').addEventListener('change', e => {
-    state.show_shapes = e.target.checked;
-    buildScene();
+  document.getElementById('show-residual').addEventListener('change', e => { state.show_residual = e.target.checked; drawArrows(); });
+  document.getElementById('show-cross').addEventListener('change', e => { state.show_cross = e.target.checked; drawArrows(); });
+  document.getElementById('show-flow').addEventListener('change', e => { state.show_flow = e.target.checked; drawArrows(); });
+  document.getElementById('show-shapes').addEventListener('change', e => { state.show_shapes = e.target.checked; buildDiagram(); });
+  document.getElementById('tilt-3d').addEventListener('change', e => {
+    state.tilt_3d = e.target.checked;
+    document.getElementById('diagram').style.transform = state.tilt_3d
+      ? 'perspective(2400px) rotateX(2deg) rotateY(-3deg)'
+      : 'none';
+    requestAnimationFrame(drawArrows);
   });
 
   document.getElementById('reset-view').addEventListener('click', () => {
-    state.rot_x = -15;
-    state.rot_z = 0;
-    state.zoom = 1;
-    state.auto_fit = true;
-    document.getElementById('rot-x').value = -15;
-    document.getElementById('rot-z').value = 0;
-    applyView();
+    state.src = [3, 4, 5, 6];
+    state.seq_len = 4;
+    state.d_model = 128;
+    state.num_heads = 8;
+    state.d_ff = 512;
+    state.enc_layers = 2;
+    state.dec_layers = 2;
+    state.task = 'reverse';
+    document.getElementById('src-input').value = '3,4,5,6';
+    document.getElementById('src-display').textContent = '[3,4,5,6]';
+    document.getElementById('seq-len').value = 4;
+    document.getElementById('seq-len-val').textContent = 4;
+    document.getElementById('d-ff').value = 512;
+    document.getElementById('d-ff-val').textContent = 512;
+    document.getElementById('enc-layers').value = 2;
+    document.getElementById('enc-layers-val').textContent = 2;
+    document.getElementById('dec-layers').value = 2;
+    document.getElementById('dec-layers-val').textContent = 2;
+    document.querySelectorAll('#d-model-toggles .toggle').forEach(x => x.classList.toggle('active', x.dataset.val === '128'));
+    document.getElementById('d-model-val').textContent = 128;
+    document.querySelectorAll('#heads-toggles .toggle').forEach(x => x.classList.toggle('active', x.dataset.val === '8'));
+    document.getElementById('num-heads-val').textContent = 8;
+    document.querySelectorAll('#task-toggles .toggle').forEach(x => x.classList.toggle('active', x.dataset.val === 'reverse'));
+    buildDiagram();
   });
 
-  window.addEventListener('resize', applyView);
+  window.addEventListener('resize', () => requestAnimationFrame(drawArrows));
+  document.getElementById('scene-wrap').addEventListener('scroll', () => requestAnimationFrame(drawArrows));
 }
 
-function updatePred() {
-  const target = computeTarget(state.src, state.task);
-  document.getElementById('pred-tokens').textContent = '[' + target.join(', ') + ']';
-}
-
-// ============================================================================
-// Mouse interaction
-// ============================================================================
-function setupMouse() {
-  const wrap = document.getElementById('scene-wrap');
-  let dragging = false;
-  let lastX, lastY;
-
-  wrap.addEventListener('mousedown', e => {
-    dragging = true;
-    lastX = e.clientX;
-    lastY = e.clientY;
-    wrap.classList.add('dragging');
-  });
-  window.addEventListener('mouseup', () => {
-    dragging = false;
-    wrap.classList.remove('dragging');
-  });
-  window.addEventListener('mousemove', e => {
-    if (!dragging) return;
-    const dx = e.clientX - lastX;
-    const dy = e.clientY - lastY;
-    state.rot_z += dx * 0.5;
-    state.rot_x -= dy * 0.5;
-    state.rot_x = Math.max(-90, Math.min(0, state.rot_x));
-    document.getElementById('rot-x').value = Math.round(state.rot_x);
-    document.getElementById('rot-z').value = Math.round(state.rot_z);
-    lastX = e.clientX;
-    lastY = e.clientY;
-    applyView();
-  });
-
-  wrap.addEventListener('wheel', e => {
-    e.preventDefault();
-    state.zoom *= e.deltaY > 0 ? 0.92 : 1.08;
-    state.zoom = Math.max(0.3, Math.min(2.5, state.zoom));
-    applyView();
-  }, { passive: false });
-}
-
-// ============================================================================
-// Init
-// ============================================================================
 setupControls();
-setupMouse();
-buildScene();
-applyView();
-updatePred();
-
+buildDiagram();
 </script>
 </body>
 </html>
