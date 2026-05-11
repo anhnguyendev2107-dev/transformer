@@ -30,7 +30,9 @@
     overflow: hidden;
     display: grid;
     place-items: center;
+    cursor: grab;
   }
+  .scene-wrap.panning { cursor: grabbing; }
 
   /* === Sidebar (kept similar) === */
   h1 { font-size: 16px; color: #58a6ff; margin-bottom: 4px; letter-spacing: 0.5px; }
@@ -578,13 +580,17 @@ const state = {
   show_shapes: false,
   tilt_3d: true,
   zoom: 1,
+  pan_x: 0,
+  pan_y: 0,
   focused_id: null,
 };
 
 function applyZoom() {
   const d = document.getElementById('diagram');
   const tilt = state.tilt_3d ? 'perspective(1800px) rotateX(8deg) rotateY(-9deg) ' : '';
-  d.style.transform = `${tilt}scale(${state.zoom})`;
+  // translate3d first so the entire transformed diagram pans on top of the
+  // tilt/scale composition (Google-Maps-style drag).
+  d.style.transform = `translate3d(${state.pan_x}px, ${state.pan_y}px, 0) ${tilt}scale(${state.zoom})`;
   document.getElementById('zoom-val').textContent = Math.round(state.zoom * 100) + '%';
   requestAnimationFrame(drawArrows);
 }
@@ -592,31 +598,66 @@ function setZoom(z) {
   state.zoom = Math.max(0.2, Math.min(2.5, z));
   applyZoom();
 }
+// Zoom around a screen-space point (clientX, clientY). The point under the
+// cursor stays fixed after zoom — matches Google Maps' pinch behaviour.
+function zoomAt(clientX, clientY, factor) {
+  const wrap = document.getElementById('scene-wrap');
+  const rect = wrap.getBoundingClientRect();
+  const cx = clientX - rect.left - rect.width / 2;
+  const cy = clientY - rect.top - rect.height / 2;
+  const newZoom = Math.max(0.2, Math.min(2.5, state.zoom * factor));
+  const ratio = newZoom / state.zoom;
+  state.pan_x = cx - (cx - state.pan_x) * ratio;
+  state.pan_y = cy - (cy - state.pan_y) * ratio;
+  state.zoom = newZoom;
+  applyZoom();
+}
+function getVisualBbox(root) {
+  // Union of all descendant client rects — picks up children that visually
+  // overflow the parent (translateZ + perspective, box-shadow, ghost frames).
+  let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+  const rootRect = root.getBoundingClientRect();
+  left = rootRect.left; top = rootRect.top;
+  right = rootRect.right; bottom = rootRect.bottom;
+  root.querySelectorAll('*').forEach(el => {
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) return;
+    if (r.left < left) left = r.left;
+    if (r.top < top) top = r.top;
+    if (r.right > right) right = r.right;
+    if (r.bottom > bottom) bottom = r.bottom;
+  });
+  return { left, top, right, bottom, width: right - left, height: bottom - top };
+}
+
 function autoFit() {
   const wrap = document.getElementById('scene-wrap');
   const diagram = document.getElementById('diagram');
   if (!wrap || !diagram) return;
-  // Measure at the CURRENT zoom (don't pop transform → that flashes).
-  const r = diagram.getBoundingClientRect();
+  // True visual bbox = union of all descendant rects (captures box-shadows,
+  // translateZ pop-out, ghost-frame offsets that getBoundingClientRect on
+  // the parent alone misses).
+  const bbox = getVisualBbox(diagram);
   const currentZoom = state.zoom || 1;
-  if (!r.width || !r.height || !currentZoom) return;
-  const naturalW = r.width / currentZoom;
-  const naturalH = r.height / currentZoom;
+  if (!bbox.width || !bbox.height || !currentZoom) return;
+  const naturalW = bbox.width / currentZoom;
+  const naturalH = bbox.height / currentZoom;
   const availW = wrap.clientWidth - 40;
   const availH = wrap.clientHeight - 40;
-  // Strict fit with safety margin. getBoundingClientRect underestimates the
-  // visual size (ghost frames, box shadows, child translateZ all extend past
-  // it), so multiply by 0.86 to leave room.
   const widthFit = availW / naturalW;
   const heightFit = availH / naturalH;
-  const fit = Math.min(widthFit, heightFit) * 0.86;
-  const newZoom = Math.max(0.3, Math.min(1.0, fit));
+  // Small safety margin for the few pixels of pseudo-element extension.
+  const fit = Math.min(widthFit, heightFit) * 0.96;
+  const newZoom = Math.max(0.25, Math.min(1.0, fit));
+  // Reset pan on autoFit (every rebuild / resize) so the diagram re-centers.
+  state.pan_x = 0;
+  state.pan_y = 0;
   const changed = Math.abs(newZoom - state.zoom) > 0.005;
   if (changed) {
     state.zoom = newZoom;
     applyZoom();
   } else {
-    requestAnimationFrame(drawArrows);
+    applyZoom();
   }
 }
 
@@ -1299,15 +1340,60 @@ function setupControls() {
     applyZoom();
   });
 
-  // Zoom controls
-  document.getElementById('zoom-in').addEventListener('click', () => setZoom(state.zoom * 1.15));
-  document.getElementById('zoom-out').addEventListener('click', () => setZoom(state.zoom / 1.15));
-  document.getElementById('zoom-reset').addEventListener('click', () => setZoom(1));
-  document.getElementById('scene-wrap').addEventListener('wheel', e => {
-    if (!(e.ctrlKey || e.metaKey)) return;  // require modifier to avoid hijacking scroll
+  // Zoom controls — buttons zoom around the scene center.
+  function buttonZoom(factor) {
+    const wrap = document.getElementById('scene-wrap');
+    const rect = wrap.getBoundingClientRect();
+    zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor);
+  }
+  document.getElementById('zoom-in').addEventListener('click', () => buttonZoom(1.15));
+  document.getElementById('zoom-out').addEventListener('click', () => buttonZoom(1 / 1.15));
+  document.getElementById('zoom-reset').addEventListener('click', () => {
+    state.pan_x = 0; state.pan_y = 0; state.zoom = 1;
+    applyZoom();
+  });
+
+  // Trackpad / mouse Google-Maps-style navigation.
+  // - Pinch (ctrlKey wheel, what trackpads emit) OR Cmd+wheel → zoom at cursor.
+  // - Two-finger pan (regular wheel deltas) → pan the diagram.
+  const sceneWrap = document.getElementById('scene-wrap');
+  sceneWrap.addEventListener('wheel', e => {
     e.preventDefault();
-    setZoom(state.zoom * (e.deltaY > 0 ? 0.92 : 1.08));
+    if (e.ctrlKey || e.metaKey) {
+      // 1 deltaY unit at pinch ≈ -1% zoom on macOS; tame the rate.
+      const factor = Math.exp(-e.deltaY * 0.01);
+      zoomAt(e.clientX, e.clientY, factor);
+    } else {
+      state.pan_x -= e.deltaX;
+      state.pan_y -= e.deltaY;
+      applyZoom();
+    }
   }, { passive: false });
+
+  // Click-and-drag pan (mouse). Ignore drags that start on a box so click+focus
+  // still works for the info tooltip.
+  let dragging = false, lastX = 0, lastY = 0;
+  sceneWrap.addEventListener('mousedown', e => {
+    if (e.target.closest('.box')) return;
+    dragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    sceneWrap.classList.add('panning');
+  });
+  window.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    state.pan_x += e.clientX - lastX;
+    state.pan_y += e.clientY - lastY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    applyZoom();
+  });
+  window.addEventListener('mouseup', () => {
+    if (dragging) {
+      dragging = false;
+      sceneWrap.classList.remove('panning');
+    }
+  });
 
   document.getElementById('reset-view').addEventListener('click', () => {
     state.src = [3, 4, 5, 6];
@@ -1319,6 +1405,8 @@ function setupControls() {
     state.dec_layers = 2;
     state.task = 'reverse';
     state.zoom = 1;
+    state.pan_x = 0;
+    state.pan_y = 0;
     document.getElementById('src-input').value = '3,4,5,6';
     document.getElementById('src-display').textContent = '[3,4,5,6]';
     document.getElementById('seq-len').value = 4;
