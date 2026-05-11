@@ -599,17 +599,24 @@ function autoFit() {
   const wrap = document.getElementById('scene-wrap');
   const diagram = document.getElementById('diagram');
   if (!wrap || !diagram) return;
-  // Measure at zoom=1 (post-tilt) so we know the true visual bbox.
-  const tilt = state.tilt_3d ? 'perspective(1800px) rotateX(8deg) rotateY(-9deg) ' : '';
-  diagram.style.transform = `${tilt}scale(1)`;
-  void diagram.offsetWidth;  // force reflow
+  // Measure at the CURRENT zoom (don't pop transform to scale(1) — that caused
+  // a visible scale(prev → 1 → fit) bounce on every param change).
   const r = diagram.getBoundingClientRect();
-  if (!r.width || !r.height) return;
+  const currentZoom = state.zoom || 1;
+  if (!r.width || !r.height || !currentZoom) return;
+  const naturalW = r.width / currentZoom;
+  const naturalH = r.height / currentZoom;
   const availW = wrap.clientWidth - 40;
   const availH = wrap.clientHeight - 40;
-  const fit = Math.min(availW / r.width, availH / r.height);
-  state.zoom = Math.max(0.2, Math.min(1.2, fit));
-  applyZoom();
+  const fit = Math.min(availW / naturalW, availH / naturalH);
+  const newZoom = Math.max(0.2, Math.min(1.2, fit));
+  // Only repaint if the zoom actually changed meaningfully.
+  if (Math.abs(newZoom - state.zoom) > 0.005) {
+    state.zoom = newZoom;
+    applyZoom();
+  } else {
+    requestAnimationFrame(drawArrows);
+  }
 }
 
 const VOCAB = 15;
