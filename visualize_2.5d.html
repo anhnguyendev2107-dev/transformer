@@ -55,13 +55,14 @@
   /* === Diagram === */
   .diagram {
     position: relative;
-    padding: 40px 60px 80px;
+    padding: 30px 24px 50px;
+    width: fit-content;
     min-height: 100%;
-    min-width: 760px;
-    transform-origin: top center;
+    transform-origin: center center;
     transform: perspective(1800px) rotateX(8deg) rotateY(-9deg) scale(1);
     transform-style: preserve-3d;
     transition: transform 0.08s linear;
+    margin: auto;
   }
   /* tilted floor grid for depth */
   .diagram::before {
@@ -109,19 +110,18 @@
   .zoom-bar .zoom-val { min-width: 42px; text-align: center; color: #7ee787; }
   .diagram-inner {
     position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 90px;
-    align-items: center;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 100px;
+    align-items: end;
+    justify-items: center;
   }
   .col {
     position: relative;
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 14px;
+    gap: 10px;
   }
 
   /* === Boxes (paper style colors) === */
@@ -279,29 +279,30 @@
     box-shadow: inset 0 -2px 0 rgba(0,0,0,0.18);
   }
 
-  /* layer-group wrapper — row direction; L1 (appended first) sits at the LEFT,
-     LN at the RIGHT, matching left-to-right data flow. */
+  /* layer-group wrapper — column-reverse so L1 (appended first) sits at the
+     BOTTOM of the stack, matching the paper's bottom-up data flow. */
   .layer-group {
     position: relative;
     display: flex;
-    flex-direction: row;
+    flex-direction: column-reverse;
     align-items: center;
-    gap: 8px;
-    padding: 14px 18px 28px;
+    gap: 10px;
+    padding: 14px 20px;
     border: 1.5px solid #cbd5e1;
     border-radius: 10px;
     background: rgba(241, 245, 249, 0.05);
   }
   .nx-label {
     position: absolute;
-    bottom: 4px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 14px;
+    right: -42px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 16px;
     font-weight: 700;
     color: #c9d1d9;
     font-style: italic;
   }
+  .col.dec .nx-label { right: auto; left: -42px; }
 
   /* PE block */
   .pe {
@@ -390,7 +391,7 @@
 
   .stats {
     position: absolute;
-    top: 20px;
+    bottom: 20px;
     left: 20px;
     padding: 10px 14px;
     background: rgba(22, 27, 34, 0.9);
@@ -575,14 +576,15 @@ function autoFit() {
   const wrap = document.getElementById('scene-wrap');
   const diagram = document.getElementById('diagram');
   if (!wrap || !diagram) return;
-  // offsetWidth/Height are pre-transform — natural CSS dimensions.
-  const naturalW = diagram.offsetWidth;
-  const naturalH = diagram.offsetHeight;
-  if (!naturalW || !naturalH) return;
+  // Measure at zoom=1 (post-tilt) so we know the true visual bbox.
+  const tilt = state.tilt_3d ? 'perspective(1800px) rotateX(8deg) rotateY(-9deg) ' : '';
+  diagram.style.transform = `${tilt}scale(1)`;
+  void diagram.offsetWidth;  // force reflow
+  const r = diagram.getBoundingClientRect();
+  if (!r.width || !r.height) return;
   const availW = wrap.clientWidth - 40;
   const availH = wrap.clientHeight - 40;
-  // Account for tilt's slight visual expansion with a 1.12 fudge factor.
-  const fit = Math.min(availW / (naturalW * 1.12), availH / (naturalH * 1.12));
+  const fit = Math.min(availW / r.width, availH / r.height);
   state.zoom = Math.max(0.2, Math.min(1.2, fit));
   applyZoom();
 }
@@ -850,8 +852,8 @@ function addNormBox(role, layer, ctx) {
 
 function makeSep() {
   const sep = document.createElement('div');
-  sep.style.width = '2px';
-  sep.style.height = '64px';
+  sep.style.width = '64px';
+  sep.style.height = '2px';
   sep.style.background = 'rgba(255,255,255,0.18)';
   sep.style.alignSelf = 'center';
   return sep;
@@ -898,7 +900,16 @@ function buildEncoderColumn() {
   nx.textContent = `${state.enc_layers}×`;
   group.appendChild(nx);
 
-  // append in left-to-right flow order: tokens → embed → PE → layers
+  // append top-to-bottom (paper-style): layers → PE → embed → tokens
+  col.appendChild(group);
+  col.appendChild(buildPE('enc'));
+  col.appendChild(makeBox({
+    title: 'Input Embedding × √d',
+    body: renderEmbedMatrix('in'),
+    shape: `(B, ${state.seq_len}, ${state.d_model})`,
+    cls: 'box-embed',
+    type: 'embed-in',
+  }));
   const tokensRow = makeBox({
     title: 'Inputs (src tokens)',
     body: renderTokens(state.src),
@@ -910,17 +921,7 @@ function buildEncoderColumn() {
   tokensRow.style.color = '#c9d1d9';
   tokensRow.style.border = '1px dashed #30363d';
   tokensRow.style.boxShadow = 'none';
-
   col.appendChild(tokensRow);
-  col.appendChild(makeBox({
-    title: 'Input Embedding × √d',
-    body: renderEmbedMatrix('in'),
-    shape: `(B, ${state.seq_len}, ${state.d_model})`,
-    cls: 'box-embed',
-    type: 'embed-in',
-  }));
-  col.appendChild(buildPE('enc'));
-  col.appendChild(group);
 
   return col;
 }
@@ -981,30 +982,15 @@ function buildDecoderColumn() {
   const target = computeTarget(state.src, state.task);
   const winner = target[0] !== undefined ? target[0] : 6;
 
-  // append in left-to-right flow order:
-  //   tokens → embed → PE → layers → linear → softmax
-  const tokensRow = makeBox({
-    title: 'Outputs (shifted right)',
-    body: renderTokens([1, ...target.slice(0, -1)]),
-    shape: `(B, L_tgt)`,
-    cls: 'box-embed',
-    type: 'embed-out',
-  });
-  tokensRow.style.background = 'rgba(255,255,255,0.03)';
-  tokensRow.style.color = '#c9d1d9';
-  tokensRow.style.border = '1px dashed #30363d';
-  tokensRow.style.boxShadow = 'none';
-
-  col.appendChild(tokensRow);
+  // append top-to-bottom (paper-style):
+  //   softmax → linear → layers → PE → embed → tokens
   col.appendChild(makeBox({
-    title: 'Output Embedding × √d',
-    body: renderEmbedMatrix('out'),
-    shape: `(B, L_tgt, ${state.d_model})`,
-    cls: 'box-embed',
-    type: 'embed-out',
+    title: 'Softmax',
+    body: renderVocabBars(winner),
+    shape: `(B, L_tgt, ${VOCAB})`,
+    cls: 'box-softmax',
+    type: 'softmax',
   }));
-  col.appendChild(buildPE('dec'));
-  col.appendChild(group);
   col.appendChild(makeBox({
     title: 'Linear',
     body: `<div style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:#1f2937;">
@@ -1016,13 +1002,27 @@ function buildDecoderColumn() {
     cls: 'box-linear',
     type: 'linear',
   }));
+  col.appendChild(group);
+  col.appendChild(buildPE('dec'));
   col.appendChild(makeBox({
-    title: 'Softmax',
-    body: renderVocabBars(winner),
-    shape: `(B, L_tgt, ${VOCAB})`,
-    cls: 'box-softmax',
-    type: 'softmax',
+    title: 'Output Embedding × √d',
+    body: renderEmbedMatrix('out'),
+    shape: `(B, L_tgt, ${state.d_model})`,
+    cls: 'box-embed',
+    type: 'embed-out',
   }));
+  const tokensRow = makeBox({
+    title: 'Outputs (shifted right)',
+    body: renderTokens([1, ...target.slice(0, -1)]),
+    shape: `(B, L_tgt)`,
+    cls: 'box-embed',
+    type: 'embed-out',
+  });
+  tokensRow.style.background = 'rgba(255,255,255,0.03)';
+  tokensRow.style.color = '#c9d1d9';
+  tokensRow.style.border = '1px dashed #30363d';
+  tokensRow.style.boxShadow = 'none';
+  col.appendChild(tokensRow);
 
   return col;
 }
@@ -1090,22 +1090,22 @@ function drawArrows() {
     svg.appendChild(p);
   }
 
-  // --- Horizontal flow arrows (left → right between consecutive boxes) ---
+  // --- Vertical flow arrows (bottom → top between consecutive boxes) ---
   function drawColumnFlow(col) {
     const items = Array.from(col.querySelectorAll('.box, .pe'));
     const placed = items.map(el => ({ el, p: pos(el) }));
-    placed.sort((a, b) => a.p.left - b.p.left);  // leftmost first
+    placed.sort((a, b) => b.p.top - a.p.top);  // bottom-most first
     for (let i = 0; i < placed.length - 1; i++) {
       const from = placed[i].p;
       const to = placed[i + 1].p;
-      arrow(`M ${from.right} ${from.y} L ${to.left - 2} ${to.y}`, 'flow');
+      arrow(`M ${from.x} ${from.top} L ${to.x} ${to.bottom + 2}`, 'flow');
     }
   }
   if (state.show_flow !== false) {
     document.querySelectorAll('.col').forEach(c => drawColumnFlow(c));
   }
 
-  // --- Residual loops: bow UP and over each sub-layer into top of Add&Norm ---
+  // --- Residual loops: curve to the LEFT around each sub-layer into Add&Norm above ---
   if (state.show_residual) {
     document.querySelectorAll('.layer-group').forEach(grp => {
       const isEnc = grp.classList.contains('enc-group');
@@ -1120,29 +1120,28 @@ function drawArrows() {
           if (!sub || !an) return;
           const sp = pos(sub);
           const ap = pos(an);
-          // Start at top-left of sub (where flow enters), loop UP, come DOWN at top of Add&Norm
-          const startX = sp.left + 6;
-          const startY = sp.top;
-          const endX = ap.x;
-          const endY = ap.top - 2;
-          const cy = Math.min(startY, endY) - 42;
-          arrow(`M ${startX} ${startY} C ${startX} ${cy}, ${endX} ${cy}, ${endX} ${endY}`, '');
+          // From bottom-left of sub, curve out LEFT, then up to mid-left of A&N (which sits above).
+          const startX = sp.left - 8;
+          const startY = sp.bottom;
+          const endX = ap.left - 8;
+          const endY = ap.y;
+          const cx = startX - 36;
+          arrow(`M ${startX} ${startY} C ${cx} ${startY}, ${cx} ${endY}, ${endX} ${endY}`, '');
         });
       }
     });
   }
 
-  // --- Cross-attention: from right edge of encoder row DOWN into each decoder cross-attn ---
+  // --- Cross-attention: from top-right of encoder column over to each decoder cross-attn ---
   if (state.show_cross) {
     const encGroup = document.querySelector('.enc-group');
     if (encGroup) {
       const eg = pos(encGroup);
-      const encOutX = eg.right - 16;
-      const encOutY = eg.bottom - 8;
+      const encOutX = eg.right - 20;
+      const encOutY = eg.top + 24;
       document.querySelectorAll('.dec-group [data-role="mha-cross"]').forEach(cross => {
         const c = pos(cross);
-        const midY = (encOutY + c.top - 10) / 2;
-        arrow(`M ${encOutX} ${encOutY} C ${encOutX} ${midY}, ${c.x} ${midY}, ${c.x} ${c.top - 2}`, 'cross');
+        arrow(`M ${encOutX} ${encOutY} C ${encOutX + 90} ${encOutY}, ${c.left - 90} ${c.y}, ${c.left - 2} ${c.y}`, 'cross');
       });
     }
   }
