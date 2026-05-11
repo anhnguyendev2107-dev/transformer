@@ -181,9 +181,28 @@
   }
   .box-shape {
     margin-top: 6px;
-    font-size: 9px;
-    color: rgba(31, 41, 55, 0.7);
+    font-size: 9.5px;
+    color: rgba(31, 41, 55, 0.85);
     font-family: "SF Mono", Menlo, monospace;
+    font-weight: 600;
+  }
+  .matrix-with-dims {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+  .dim-hint {
+    font-size: 9px;
+    font-family: "SF Mono", Menlo, monospace;
+    color: rgba(31, 41, 55, 0.7);
+    font-weight: 600;
+    letter-spacing: 0.2px;
+  }
+  .matrix-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
   }
 
   .box-addnorm  { background-color: #fef3c7; min-width: 150px; }
@@ -518,7 +537,7 @@
       <label class="checkbox"><input type="checkbox" id="show-residual" checked> Residual arrows</label>
       <label class="checkbox"><input type="checkbox" id="show-cross" checked> Cross-attention arrows</label>
       <label class="checkbox"><input type="checkbox" id="show-flow" checked> Animate flow</label>
-      <label class="checkbox"><input type="checkbox" id="show-shapes"> Show tensor shapes</label>
+      <label class="checkbox"><input type="checkbox" id="show-shapes" checked> Show tensor shapes</label>
       <label class="checkbox"><input type="checkbox" id="tilt-3d" checked> 2.5D tilt</label>
       <button class="action" id="reset-view">Reset</button>
     </div>
@@ -577,7 +596,7 @@ const state = {
   show_residual: true,
   show_cross: true,
   show_flow: true,
-  show_shapes: false,
+  show_shapes: true,
   tilt_3d: true,
   zoom: 1,
   pan_x: 0,
@@ -801,6 +820,7 @@ function renderAttnHeads(kind) {
   const headsShow = Math.min(state.num_heads, 4);
   const cellSize = state.seq_len > 6 ? 5 : (state.seq_len > 4 ? 6 : 7);
   const isCross = kind === 'cross';
+  const dk = state.d_model / state.num_heads;
   let html = '';
   for (let h = 0; h < headsShow; h++) {
     const cells = [];
@@ -830,7 +850,10 @@ function renderAttnHeads(kind) {
   if (state.num_heads > headsShow) {
     html += `<span class="heads-overflow">+${state.num_heads - headsShow} heads</span>`;
   }
-  return html;
+  return `<div class="matrix-with-dims">
+    <div class="matrix-row">${html}</div>
+    <div class="dim-hint">${state.num_heads} × [${seqQ}×${seqK}] · d_k=${dk}</div>
+  </div>`;
 }
 
 function renderEmbedMatrix(kind) {
@@ -848,21 +871,26 @@ function renderEmbedMatrix(kind) {
       cells.push(`<div style="width:${cellSize}px;height:${cellSize}px;background:hsl(${hue},70%,${light}%);border-radius:1px;"></div>`);
     }
   }
-  return `<div class="embed-mat" style="grid-template-columns:repeat(${cols},${cellSize}px);">${cells.join('')}</div>`;
+  return `<div class="matrix-with-dims">
+    <div class="embed-mat" style="grid-template-columns:repeat(${cols},${cellSize}px);">${cells.join('')}</div>
+    <div class="dim-hint">L=${rows} × d=${state.d_model} <span style="opacity:0.6">(${cols} cols shown)</span></div>
+  </div>`;
 }
 
 function renderFFN() {
-  // 3 bars: d_model, d_ff, d_model. Heights proportional with sqrt for visibility.
   const maxH = 44;
   const baseH = maxH * 0.35;
   const wideH = Math.min(maxH, baseH + (maxH - baseH) * Math.min(1, (state.d_ff / state.d_model - 1) / 15));
   return `
-    <div class="ffn-vis">
-      <div class="ffn-bar" style="height:${baseH}px;"><div class="label">${state.d_model}</div></div>
-      <span class="ffn-arrow">→</span>
-      <div class="ffn-bar wide" style="height:${wideH}px;"><div class="label">${state.d_ff}</div></div>
-      <span class="ffn-arrow">→</span>
-      <div class="ffn-bar" style="height:${baseH}px;"><div class="label">${state.d_model}</div></div>
+    <div class="matrix-with-dims">
+      <div class="ffn-vis">
+        <div class="ffn-bar" style="height:${baseH}px;"><div class="label">${state.d_model}</div></div>
+        <span class="ffn-arrow">→</span>
+        <div class="ffn-bar wide" style="height:${wideH}px;"><div class="label">${state.d_ff}</div></div>
+        <span class="ffn-arrow">→</span>
+        <div class="ffn-bar" style="height:${baseH}px;"><div class="label">${state.d_model}</div></div>
+      </div>
+      <div class="dim-hint">[L, ${state.d_model}] → [L, ${state.d_ff}] → [L, ${state.d_model}]</div>
     </div>
   `;
 }
@@ -874,9 +902,13 @@ function renderVocabBars(winnerIdx) {
     probs.push(Math.exp(-d * d / 1.5));
   }
   const max = Math.max(...probs);
-  return `<div class="vocab-bars">` + probs.map((p, i) =>
+  const bars = probs.map((p, i) =>
     `<div class="${i === winnerIdx ? 'winner' : ''}" style="height:${(p / max) * 100}%"></div>`
-  ).join('') + `</div>`;
+  ).join('');
+  return `<div class="matrix-with-dims">
+    <div class="vocab-bars">${bars}</div>
+    <div class="dim-hint">[L, vocab=${VOCAB}]</div>
+  </div>`;
 }
 
 function renderTokens(ids) {
@@ -1080,10 +1112,13 @@ function buildDecoderColumn() {
   }));
   col.appendChild(makeBox({
     title: 'Linear',
-    body: `<div style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:#1f2937;">
-      <div class="ffn-bar" style="height:24px;width:14px;"><div class="label">${state.d_model}</div></div>
-      <span class="ffn-arrow">→</span>
-      <div class="ffn-bar wide" style="height:36px;width:18px;"><div class="label">${VOCAB}</div></div>
+    body: `<div class="matrix-with-dims">
+      <div style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:#1f2937;">
+        <div class="ffn-bar" style="height:24px;width:14px;"><div class="label">${state.d_model}</div></div>
+        <span class="ffn-arrow">→</span>
+        <div class="ffn-bar wide" style="height:36px;width:18px;"><div class="label">${VOCAB}</div></div>
+      </div>
+      <div class="dim-hint">[L, ${state.d_model}] → [L, ${VOCAB}]</div>
     </div>`,
     shape: `(B, L_tgt, ${VOCAB})`,
     cls: 'box-linear',
