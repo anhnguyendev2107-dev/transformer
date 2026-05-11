@@ -109,18 +109,19 @@
   .zoom-bar .zoom-val { min-width: 42px; text-align: center; color: #7ee787; }
   .diagram-inner {
     position: relative;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 100px;
-    align-items: end;
-    justify-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: 90px;
+    align-items: center;
+    justify-content: center;
   }
   .col {
     position: relative;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
-    gap: 8px;
+    justify-content: center;
+    gap: 14px;
   }
 
   /* === Boxes (paper style colors) === */
@@ -278,30 +279,29 @@
     box-shadow: inset 0 -2px 0 rgba(0,0,0,0.18);
   }
 
-  /* layer-group wrapper — column-reverse so layer 1 (appended first) sits at the
-     bottom of the stack, matching the paper's bottom-up data flow. */
+  /* layer-group wrapper — row direction; L1 (appended first) sits at the LEFT,
+     LN at the RIGHT, matching left-to-right data flow. */
   .layer-group {
     position: relative;
     display: flex;
-    flex-direction: column-reverse;
+    flex-direction: row;
     align-items: center;
     gap: 8px;
-    padding: 14px 20px;
+    padding: 14px 18px 28px;
     border: 1.5px solid #cbd5e1;
     border-radius: 10px;
     background: rgba(241, 245, 249, 0.05);
   }
   .nx-label {
     position: absolute;
-    right: -42px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 16px;
+    bottom: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 14px;
     font-weight: 700;
     color: #c9d1d9;
     font-style: italic;
   }
-  .col.dec .nx-label { right: auto; left: -42px; }
 
   /* PE block */
   .pe {
@@ -833,6 +833,15 @@ function addNormBox(role, layer, ctx) {
   return b;
 }
 
+function makeSep() {
+  const sep = document.createElement('div');
+  sep.style.width = '2px';
+  sep.style.height = '64px';
+  sep.style.background = 'rgba(255,255,255,0.18)';
+  sep.style.alignSelf = 'center';
+  return sep;
+}
+
 function buildEncoderColumn() {
   const col = document.createElement('div');
   col.className = 'col enc';
@@ -841,11 +850,7 @@ function buildEncoderColumn() {
   group.className = 'layer-group enc-group';
 
   for (let l = 1; l <= state.enc_layers; l++) {
-    if (l > 1) {
-      const sep = document.createElement('div');
-      sep.style.height = '12px';
-      group.appendChild(sep);
-    }
+    if (l > 1) group.appendChild(makeSep());
     const mha = makeBox({
       title: `Multi-Head Attention`,
       body: renderAttnHeads('self-enc'),
@@ -878,15 +883,7 @@ function buildEncoderColumn() {
   nx.textContent = `${state.enc_layers}×`;
   group.appendChild(nx);
 
-  col.appendChild(group);
-  col.appendChild(buildPE('enc'));
-  col.appendChild(makeBox({
-    title: 'Input Embedding × √d',
-    body: renderEmbedMatrix('in'),
-    shape: `(B, ${state.seq_len}, ${state.d_model})`,
-    cls: 'box-embed',
-    type: 'embed-in',
-  }));
+  // append in left-to-right flow order: tokens → embed → PE → layers
   const tokensRow = makeBox({
     title: 'Inputs (src tokens)',
     body: renderTokens(state.src),
@@ -898,7 +895,17 @@ function buildEncoderColumn() {
   tokensRow.style.color = '#c9d1d9';
   tokensRow.style.border = '1px dashed #30363d';
   tokensRow.style.boxShadow = 'none';
+
   col.appendChild(tokensRow);
+  col.appendChild(makeBox({
+    title: 'Input Embedding × √d',
+    body: renderEmbedMatrix('in'),
+    shape: `(B, ${state.seq_len}, ${state.d_model})`,
+    cls: 'box-embed',
+    type: 'embed-in',
+  }));
+  col.appendChild(buildPE('enc'));
+  col.appendChild(group);
 
   return col;
 }
@@ -911,11 +918,7 @@ function buildDecoderColumn() {
   group.className = 'layer-group dec-group';
 
   for (let l = 1; l <= state.dec_layers; l++) {
-    if (l > 1) {
-      const sep = document.createElement('div');
-      sep.style.height = '12px';
-      group.appendChild(sep);
-    }
+    if (l > 1) group.appendChild(makeSep());
     const mhaM = makeBox({
       title: 'Masked Multi-Head Attention',
       body: renderAttnHeads('masked'),
@@ -963,13 +966,30 @@ function buildDecoderColumn() {
   const target = computeTarget(state.src, state.task);
   const winner = target[0] !== undefined ? target[0] : 6;
 
+  // append in left-to-right flow order:
+  //   tokens → embed → PE → layers → linear → softmax
+  const tokensRow = makeBox({
+    title: 'Outputs (shifted right)',
+    body: renderTokens([1, ...target.slice(0, -1)]),
+    shape: `(B, L_tgt)`,
+    cls: 'box-embed',
+    type: 'embed-out',
+  });
+  tokensRow.style.background = 'rgba(255,255,255,0.03)';
+  tokensRow.style.color = '#c9d1d9';
+  tokensRow.style.border = '1px dashed #30363d';
+  tokensRow.style.boxShadow = 'none';
+
+  col.appendChild(tokensRow);
   col.appendChild(makeBox({
-    title: 'Softmax',
-    body: renderVocabBars(winner),
-    shape: `(B, L_tgt, ${VOCAB})`,
-    cls: 'box-softmax',
-    type: 'softmax',
+    title: 'Output Embedding × √d',
+    body: renderEmbedMatrix('out'),
+    shape: `(B, L_tgt, ${state.d_model})`,
+    cls: 'box-embed',
+    type: 'embed-out',
   }));
+  col.appendChild(buildPE('dec'));
+  col.appendChild(group);
   col.appendChild(makeBox({
     title: 'Linear',
     body: `<div style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:#1f2937;">
@@ -981,27 +1001,13 @@ function buildDecoderColumn() {
     cls: 'box-linear',
     type: 'linear',
   }));
-  col.appendChild(group);
-  col.appendChild(buildPE('dec'));
   col.appendChild(makeBox({
-    title: 'Output Embedding × √d',
-    body: renderEmbedMatrix('out'),
-    shape: `(B, L_tgt, ${state.d_model})`,
-    cls: 'box-embed',
-    type: 'embed-out',
+    title: 'Softmax',
+    body: renderVocabBars(winner),
+    shape: `(B, L_tgt, ${VOCAB})`,
+    cls: 'box-softmax',
+    type: 'softmax',
   }));
-  const tokensRow = makeBox({
-    title: 'Outputs (shifted right)',
-    body: renderTokens([1, ...target.slice(0, -1)]),  // SOS + first L-1 tokens
-    shape: `(B, L_tgt)`,
-    cls: 'box-embed',
-    type: 'embed-out',
-  });
-  tokensRow.style.background = 'rgba(255,255,255,0.03)';
-  tokensRow.style.color = '#c9d1d9';
-  tokensRow.style.border = '1px dashed #30363d';
-  tokensRow.style.boxShadow = 'none';
-  col.appendChild(tokensRow);
 
   return col;
 }
@@ -1068,23 +1074,22 @@ function drawArrows() {
     svg.appendChild(p);
   }
 
-  // --- Column flow (bottom → top vertical arrows between consecutive boxes) ---
+  // --- Horizontal flow arrows (left → right between consecutive boxes) ---
   function drawColumnFlow(col) {
     const items = Array.from(col.querySelectorAll('.box, .pe'));
     const placed = items.map(el => ({ el, p: pos(el) }));
-    placed.sort((a, b) => b.p.top - a.p.top);  // bottom-most first
+    placed.sort((a, b) => a.p.left - b.p.left);  // leftmost first
     for (let i = 0; i < placed.length - 1; i++) {
       const from = placed[i].p;
       const to = placed[i + 1].p;
-      // arrow from top of bottom-box → just above the bottom of upper-box
-      arrow(`M ${from.x} ${from.top} L ${to.x} ${to.bottom + 2}`, 'flow');
+      arrow(`M ${from.right} ${from.y} L ${to.left - 2} ${to.y}`, 'flow');
     }
   }
   if (state.show_flow !== false) {
     document.querySelectorAll('.col').forEach(c => drawColumnFlow(c));
   }
 
-  // --- Residual loops around each sub-layer ---
+  // --- Residual loops: bow UP and over each sub-layer into top of Add&Norm ---
   if (state.show_residual) {
     document.querySelectorAll('.layer-group').forEach(grp => {
       const isEnc = grp.classList.contains('enc-group');
@@ -1099,28 +1104,29 @@ function drawArrows() {
           if (!sub || !an) return;
           const sp = pos(sub);
           const ap = pos(an);
-          // Bottom-left of sub → curve left → middle-left of add&norm (which is above sub).
-          const startX = sp.left - 8;
-          const startY = sp.bottom;
-          const endX = ap.left - 8;
-          const endY = ap.y;
-          const cx = startX - 36;
-          arrow(`M ${startX} ${startY} C ${cx} ${startY}, ${cx} ${endY}, ${endX} ${endY}`, '');
+          // Start at top-left of sub (where flow enters), loop UP, come DOWN at top of Add&Norm
+          const startX = sp.left + 6;
+          const startY = sp.top;
+          const endX = ap.x;
+          const endY = ap.top - 2;
+          const cy = Math.min(startY, endY) - 42;
+          arrow(`M ${startX} ${startY} C ${startX} ${cy}, ${endX} ${cy}, ${endX} ${endY}`, '');
         });
       }
     });
   }
 
-  // --- Cross-attention arrows: top of encoder group → each decoder cross-attn ---
+  // --- Cross-attention: from right edge of encoder row DOWN into each decoder cross-attn ---
   if (state.show_cross) {
     const encGroup = document.querySelector('.enc-group');
     if (encGroup) {
       const eg = pos(encGroup);
-      const encTopX = eg.right - 20;
-      const encTopY = eg.top + 24;
+      const encOutX = eg.right - 16;
+      const encOutY = eg.bottom - 8;
       document.querySelectorAll('.dec-group [data-role="mha-cross"]').forEach(cross => {
         const c = pos(cross);
-        arrow(`M ${encTopX} ${encTopY} C ${encTopX + 90} ${encTopY}, ${c.left - 90} ${c.y}, ${c.left - 2} ${c.y}`, 'cross');
+        const midY = (encOutY + c.top - 10) / 2;
+        arrow(`M ${encOutX} ${encOutY} C ${encOutX} ${midY}, ${c.x} ${midY}, ${c.x} ${c.top - 2}`, 'cross');
       });
     }
   }
