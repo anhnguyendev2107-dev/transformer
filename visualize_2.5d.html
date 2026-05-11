@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Transformer 2.5D — Interactive</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: radial-gradient(ellipse at center, #1a1f2e 0%, #0a0d14 100%);
+    color: #c9d1d9;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    user-select: none;
+  }
+
+  /* === Layout === */
+  .app { display: flex; height: 100vh; }
+  .sidebar {
+    width: 320px;
+    flex-shrink: 0;
+    padding: 20px;
+    border-right: 1px solid #30363d;
+    background: rgba(13, 17, 23, 0.85);
+    backdrop-filter: blur(10px);
+    overflow-y: auto;
+    z-index: 10;
+  }
+  .scene-wrap {
+    flex: 1;
+    position: relative;
+    cursor: grab;
+    overflow: hidden;
+  }
+  .scene-wrap.dragging { cursor: grabbing; }
+
+  /* === Sidebar === */
+  h1 {
+    font-size: 16px;
+    color: #58a6ff;
+    margin-bottom: 4px;
+    letter-spacing: 0.5px;
+  }
+  .sub {
+    font-size: 11px;
+    color: #6e7681;
+    margin-bottom: 20px;
+  }
+  .group {
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #21262d;
+  }
+  .group:last-child { border-bottom: none; }
+  .group-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #6e7681;
+    margin-bottom: 10px;
+  }
+  .control {
+    margin-bottom: 12px;
+  }
+  .control-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin-bottom: 6px;
+  }
+  .control-label .name { color: #c9d1d9; }
+  .control-label .value {
+    color: #7ee787;
+    font-family: "SF Mono", Menlo, monospace;
+    background: #161b22;
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+  input[type="range"] {
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    height: 16px;
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    background: #21262d;
+    height: 4px;
+    border-radius: 2px;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: #58a6ff;
+    border-radius: 50%;
+    margin-top: -5px;
+    cursor: pointer;
+  }
+  select, input[type="text"] {
+    width: 100%;
+    padding: 6px 8px;
+    background: #161b22;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: "SF Mono", Menlo, monospace;
+  }
+  .toggle-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .toggle {
+    flex: 1;
+    min-width: 50px;
+    padding: 6px 8px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: "SF Mono", Menlo, monospace;
+    color: #8b949e;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .toggle:hover { border-color: #58a6ff; color: #c9d1d9; }
+  .toggle.active {
+    background: #1f6feb;
+    border-color: #58a6ff;
+    color: white;
+  }
+  .checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .checkbox input { cursor: pointer; }
+  button.action {
+    width: 100%;
+    padding: 8px;
+    background: #238636;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+  button.action:hover { background: #2ea043; }
+  button.secondary {
+    background: #21262d;
+    color: #c9d1d9;
+  }
+  button.secondary:hover { background: #30363d; }
+
+  /* === Scene === */
+  .stage {
+    position: absolute;
+    inset: 0;
+    perspective: 2500px;
+    perspective-origin: 50% 35%;
+  }
+  .world {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform-style: preserve-3d;
+    transform: translate(-50%, -50%) rotateX(-58deg) rotateZ(35deg);
+    transition: transform 0.05s linear;
+  }
+  .slab {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-style: preserve-3d;
+    cursor: pointer;
+    transition: filter 0.2s;
+  }
+  .slab:hover { filter: brightness(1.3); }
+  .slab.focused { filter: brightness(1.5) drop-shadow(0 0 20px #58a6ff); }
+  .slab-plate {
+    background: rgba(22, 27, 34, 0.85);
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 10px;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  }
+  .slab-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #58a6ff;
+    margin-bottom: 6px;
+  }
+  .slab-shape {
+    position: absolute;
+    bottom: 4px;
+    right: 8px;
+    font-size: 9px;
+    color: #6e7681;
+    font-family: "SF Mono", Menlo, monospace;
+  }
+  .slab-content { position: relative; }
+
+  /* Token row */
+  .token-row { display: flex; gap: 4px; }
+  .token-box {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 13px;
+    color: white;
+    box-shadow: inset 0 -2px 0 rgba(0,0,0,0.2);
+  }
+
+  /* Matrix grid (embedding / hidden state) */
+  .matrix-grid {
+    display: grid;
+    gap: 1px;
+  }
+  .matrix-cell {
+    width: 12px;
+    height: 12px;
+    border-radius: 1px;
+  }
+
+  /* Attention heatmap */
+  .attn-cell-3d {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    color: white;
+    border-radius: 1px;
+  }
+
+  /* Heads stack */
+  .heads-stack {
+    display: flex;
+    gap: 4px;
+  }
+  .head-mini {
+    display: grid;
+    gap: 1px;
+  }
+  .head-mini > div {
+    width: 8px;
+    height: 8px;
+    border-radius: 1px;
+  }
+
+  /* FFN bar */
+  .ffn-vis {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+  }
+  .ffn-block {
+    height: 24px;
+    background: linear-gradient(180deg, #1f6feb, #1158c7);
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 9px;
+    font-family: monospace;
+    min-width: 32px;
+  }
+  .ffn-block.wide {
+    background: linear-gradient(180deg, #a371f7, #6e40c9);
+  }
+
+  /* Vocab dist */
+  .vocab-bars-3d {
+    display: flex;
+    gap: 2px;
+    align-items: flex-end;
+    height: 40px;
+  }
+  .vocab-bar-3d {
+    width: 8px;
+    background: #58a6ff;
+    border-radius: 1px 1px 0 0;
+  }
+  .vocab-bar-3d.winner { background: #56d364; }
+
+  /* Connecting lines between slabs (drawn via SVG overlay would be hard in 3D —
+     use vertical "pillars" instead) */
+  .pillar {
+    position: absolute;
+    width: 2px;
+    background: linear-gradient(180deg, rgba(88,166,255,0.6), rgba(88,166,255,0.1));
+    border-radius: 1px;
+  }
+  .pillar.flow {
+    background: linear-gradient(180deg, rgba(86,211,100,0.8), rgba(86,211,100,0.2));
+    animation: flowPulse 2s linear infinite;
+  }
+  @keyframes flowPulse {
+    0% { opacity: 0.4; }
+    50% { opacity: 1; }
+    100% { opacity: 0.4; }
+  }
+
+  /* Info card (right-floating) */
+  .info-card {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 280px;
+    padding: 14px;
+    background: rgba(22, 27, 34, 0.95);
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    z-index: 5;
+    backdrop-filter: blur(10px);
+  }
+  .info-card h2 {
+    font-size: 13px;
+    color: #f0883e;
+    margin-bottom: 6px;
+  }
+  .info-card .desc {
+    font-size: 12px;
+    color: #c9d1d9;
+    line-height: 1.5;
+  }
+  .info-card .shape-row {
+    margin-top: 8px;
+    padding: 6px 10px;
+    background: #0d1117;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 11px;
+    color: #7ee787;
+  }
+  .info-card .formula {
+    margin-top: 8px;
+    padding: 6px 10px;
+    background: #0d1117;
+    border-left: 2px solid #58a6ff;
+    font-family: monospace;
+    font-size: 11px;
+    color: #c9d1d9;
+  }
+
+  /* Hint */
+  .hint {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 16px;
+    background: rgba(22, 27, 34, 0.9);
+    border: 1px solid #30363d;
+    border-radius: 20px;
+    font-size: 11px;
+    color: #8b949e;
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  /* Stats overlay */
+  .stats {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    padding: 10px 14px;
+    background: rgba(22, 27, 34, 0.9);
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 11px;
+    z-index: 5;
+  }
+  .stats div { padding: 1px 0; }
+  .stats .key { color: #6e7681; }
+  .stats .val { color: #7ee787; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <aside class="sidebar">
+    <h1>Transformer 2.5D</h1>
+    <div class="sub">Kéo chuột để xoay scene • Click slab để xem chi tiết</div>
+
+    <div class="group">
+      <div class="group-title">Input</div>
+      <div class="control">
+        <div class="control-label"><span class="name">src tokens</span><span class="value" id="src-display">[3,4,5,6]</span></div>
+        <input type="text" id="src-input" value="3,4,5,6">
+      </div>
+      <div class="control">
+        <div class="control-label"><span class="name">seq_len</span><span class="value" id="seq-len-val">4</span></div>
+        <input type="range" id="seq-len" min="2" max="8" value="4">
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Model</div>
+      <div class="control">
+        <div class="control-label"><span class="name">d_model</span><span class="value" id="d-model-val">128</span></div>
+        <div class="toggle-row" id="d-model-toggles">
+          <div class="toggle" data-val="32">32</div>
+          <div class="toggle" data-val="64">64</div>
+          <div class="toggle active" data-val="128">128</div>
+          <div class="toggle" data-val="256">256</div>
+        </div>
+      </div>
+      <div class="control">
+        <div class="control-label"><span class="name">num_heads</span><span class="value" id="num-heads-val">8</span></div>
+        <div class="toggle-row" id="heads-toggles">
+          <div class="toggle" data-val="2">2</div>
+          <div class="toggle" data-val="4">4</div>
+          <div class="toggle active" data-val="8">8</div>
+          <div class="toggle" data-val="16">16</div>
+        </div>
+      </div>
+      <div class="control">
+        <div class="control-label"><span class="name">d_ff</span><span class="value" id="d-ff-val">512</span></div>
+        <input type="range" id="d-ff" min="128" max="2048" step="128" value="512">
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Layers</div>
+      <div class="control">
+        <div class="control-label"><span class="name">encoder layers</span><span class="value" id="enc-layers-val">2</span></div>
+        <input type="range" id="enc-layers" min="1" max="6" value="2">
+      </div>
+      <div class="control">
+        <div class="control-label"><span class="name">decoder layers</span><span class="value" id="dec-layers-val">2</span></div>
+        <input type="range" id="dec-layers" min="1" max="6" value="2">
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Task</div>
+      <div class="control">
+        <div class="toggle-row" id="task-toggles">
+          <div class="toggle active" data-val="reverse">reverse</div>
+          <div class="toggle" data-val="copy">copy</div>
+          <div class="toggle" data-val="sort">sort</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">View</div>
+      <div class="control">
+        <div class="control-label"><span class="name">tilt X</span><span class="value" id="rotx-val">-58°</span></div>
+        <input type="range" id="rot-x" min="-90" max="0" value="-58">
+      </div>
+      <div class="control">
+        <div class="control-label"><span class="name">spin Z</span><span class="value" id="rotz-val">35°</span></div>
+        <input type="range" id="rot-z" min="-180" max="180" value="35">
+      </div>
+      <div class="control">
+        <div class="control-label"><span class="name">spacing</span><span class="value" id="spacing-val">90</span></div>
+        <input type="range" id="spacing" min="40" max="160" value="90">
+      </div>
+      <label class="checkbox"><input type="checkbox" id="show-flow" checked> Animate flow</label>
+      <label class="checkbox"><input type="checkbox" id="show-shapes" checked> Show tensor shapes</label>
+      <button class="action secondary" id="reset-view">Reset view</button>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Output (mô phỏng)</div>
+      <div style="font-size:12px;color:#c9d1d9;line-height:1.6;" id="output-preview">
+        Predicted: <span style="color:#56d364" id="pred-tokens">[6, 5, 4, 3]</span>
+      </div>
+    </div>
+  </aside>
+
+  <div class="scene-wrap" id="scene-wrap">
+    <div class="stats" id="stats"></div>
+    <div class="info-card" id="info-card">
+      <h2>Click vào slab bên trái để xem chi tiết</h2>
+      <div class="desc">Mỗi slab là một bước trong forward pass. Hover để highlight, click để focus và xem mô tả + công thức.</div>
+    </div>
+    <div class="stage">
+      <div class="world" id="world"></div>
+    </div>
+    <div class="hint">Kéo chuột để xoay • Lăn chuột để zoom • Đổi params bên trái để rebuild</div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================================
+// State
+// ============================================================================
+const state = {
+  src: [3, 4, 5, 6],
+  seq_len: 4,
+  d_model: 128,
+  num_heads: 8,
+  d_ff: 512,
+  enc_layers: 2,
+  dec_layers: 2,
+  task: 'reverse',
+  rot_x: -58,
+  rot_z: 35,
+  zoom: 1,
+  spacing: 90,
+  show_flow: true,
+  show_shapes: true,
+  focused_id: null,
+};
+
+const PAD = 0, SOS = 1, EOS = 2;
+
+// Token palette (color per token id; use HSL hash)
+function tokenColor(id) {
+  if (id === PAD) return '#21262d';
+  if (id === SOS || id === EOS) return '#6e7681';
+  const hue = (id * 47) % 360;
+  return `hsl(${hue}, 65%, 55%)`;
+}
+
+function tokenLabel(id) {
+  if (id === PAD) return 'PAD';
+  if (id === SOS) return 'SOS';
+  if (id === EOS) return 'EOS';
+  return String(id);
+}
+
+// ============================================================================
+// Compute output based on task
+// ============================================================================
+function computeTarget(src, task) {
+  if (task === 'reverse') return [...src].reverse();
+  if (task === 'sort') return [...src].sort((a, b) => a - b);
+  return [...src];   // copy
+}
+
+// ============================================================================
+// Slab builders — each returns { html, height, width, title, info }
+// ============================================================================
+
+function slabInput() {
+  const html = `<div class="slab-plate">
+    <div class="slab-title">Input tokens (src)</div>
+    <div class="slab-content">
+      <div class="token-row">
+        ${state.src.map((id, i) => `
+          <div class="token-box" style="background:${tokenColor(id)}">${tokenLabel(id)}</div>
+        `).join('')}
+      </div>
+      ${state.show_shapes ? `<div class="slab-shape">(1, ${state.seq_len})</div>` : ''}
+    </div>
+  </div>`;
+  return {
+    html, type: 'input',
+    title: 'Input tokens',
+    desc: 'Chuỗi token ID nguyên dương. Token đặc biệt: 0=PAD, 1=SOS, 2=EOS. Còn lại là vocab thực.',
+    shape: `src.shape = (batch=1, seq_len=${state.seq_len})`,
+    formula: 'src ∈ ℕ^(B × L)',
+  };
+}
+
+function slabEmbedding() {
+  const cols = 16;
+  const rows = state.seq_len;
+  const cellSize = 12;
+  const cells = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const seed = (state.src[r] * 97 + c * 31) & 0xff;
+      const hue = (seed * 1.4 + state.src[r] * 47) % 360;
+      cells.push(`<div class="matrix-cell" style="background:hsl(${hue},60%,${30 + (seed % 30)}%)"></div>`);
+    }
+  }
+  const html = `<div class="slab-plate">
+    <div class="slab-title">Embedding × √d_model</div>
+    <div class="slab-content">
+      <div class="matrix-grid" style="grid-template-columns:repeat(${cols},${cellSize}px);">
+        ${cells.join('')}
+      </div>
+      ${state.show_shapes ? `<div class="slab-shape">(1, ${state.seq_len}, ${state.d_model})</div>` : ''}
+    </div>
+  </div>`;
+  return {
+    html, type: 'embedding',
+    title: 'Embedding',
+    desc: `Mỗi token ID → vector ${state.d_model}-d. Nhân √${state.d_model} ≈ ${Math.sqrt(state.d_model).toFixed(2)}. Grid hiển thị nén ${cols} cột (thực tế ${state.d_model}).`,
+    shape: `(1, ${state.seq_len}, ${state.d_model})`,
+    formula: 'E = Embed(src) × √d_model',
+  };
+}
+
+function slabPosEnc() {
+  // Visualize as wave overlay on grid
+  const cols = 16;
+  const rows = state.seq_len;
+  const cells = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const isEven = c % 2 === 0;
+      const angle = r / Math.pow(10000, c / state.d_model);
+      const val = isEven ? Math.sin(angle) : Math.cos(angle);
+      const intensity = Math.round((val + 1) * 127);
+      cells.push(`<div class="matrix-cell" style="background:rgba(88,166,255,${(val + 1) / 2})"></div>`);
+    }
+  }
+  const html = `<div class="slab-plate">
+    <div class="slab-title">+ Positional Encoding</div>
+    <div class="slab-content">
+      <div class="matrix-grid" style="grid-template-columns:repeat(${cols},12px);">
+        ${cells.join('')}
+      </div>
+      ${state.show_shapes ? `<div class="slab-shape">(1, ${state.seq_len}, ${state.d_model})</div>` : ''}
+    </div>
+  </div>`;
+  return {
+    html, type: 'posenc',
+    title: 'Positional Encoding',
+    desc: 'Cộng sin/cos pattern theo vị trí. Cho phép model phân biệt thứ tự token. Pattern cố định, không học.',
+    shape: `(1, ${state.seq_len}, ${state.d_model})`,
+    formula: 'PE(pos, 2i)   = sin(pos / 10000^(2i/d))\nPE(pos, 2i+1) = cos(pos / 10000^(2i/d))',
+  };
+}
+
+function slabAttention(layerIdx, kind) {
+  // kind: 'self-enc' | 'self-dec-masked' | 'cross'
+  const seqQ = (kind === 'cross') ? 1 : state.seq_len;
+  const seqK = state.seq_len;
+  const headBlocks = Math.min(state.num_heads, 8);
+  const headBlockSize = 8;
+  const headHtml = [];
+  for (let h = 0; h < headBlocks; h++) {
+    const cellsPerHead = [];
+    for (let i = 0; i < seqQ; i++) {
+      for (let j = 0; j < seqK; j++) {
+        let w;
+        // Pattern depends on task & kind
+        if (kind === 'self-enc') {
+          w = (i === j) ? 0.5 : 0.1 + 0.3 * Math.exp(-Math.abs(i - j) * 0.5);
+        } else if (kind === 'self-dec-masked') {
+          w = (j <= i) ? (i === j ? 0.6 : 0.2) : 0;
+        } else { // cross
+          if (state.task === 'reverse') {
+            // attend opposite end
+            w = (j === seqK - 1) ? 0.7 : 0.1;
+          } else if (state.task === 'sort') {
+            // attend min (just visualize: first src for simplicity)
+            w = (j === 0) ? 0.6 : 0.15;
+          } else {
+            w = (j === i) ? 0.7 : 0.1;
+          }
+        }
+        const alpha = Math.max(0.05, w);
+        cellsPerHead.push(`<div style="background:rgba(${kind === 'cross' ? '86,211,100' : '88,166,255'},${alpha})"></div>`);
+      }
+    }
+    headHtml.push(`<div class="head-mini" style="grid-template-columns:repeat(${seqK},${headBlockSize}px);grid-auto-rows:${headBlockSize}px;">${cellsPerHead.join('')}</div>`);
+  }
+
+  const title = kind === 'self-enc' ? `Enc L${layerIdx}: Self-Attn`
+              : kind === 'self-dec-masked' ? `Dec L${layerIdx}: Masked Self-Attn`
+              : `Dec L${layerIdx}: Cross-Attn`;
+  const shape = `(1, ${seqQ}, ${state.d_model})`;
+  const descMap = {
+    'self-enc': `${state.num_heads} head song song, mỗi head ${state.d_model / state.num_heads}-d. Token trong src attend lẫn nhau.`,
+    'self-dec-masked': 'Causal mask: token tại pos i chỉ attend ≤ i. Ngăn nhìn trộm tương lai khi train.',
+    'cross': `Q từ decoder, K/V từ encoder memory. ${state.task === 'reverse' ? 'Học attend ngược (pos cuối src ↔ pos đầu tgt).' : state.task === 'sort' ? 'Học attend "min chưa sinh".' : 'Attend cùng vị trí.'}`,
+  };
+
+  const html = `<div class="slab-plate">
+    <div class="slab-title">${title} (${state.num_heads} heads)</div>
+    <div class="slab-content">
+      <div class="heads-stack">${headHtml.join('')}</div>
+      ${state.show_shapes ? `<div class="slab-shape">${shape}</div>` : ''}
+    </div>
+  </div>`;
+  return {
+    html, type: kind,
+    title,
+    desc: descMap[kind],
+    shape,
+    formula: 'Attn(Q,K,V) = softmax(QKᵀ/√d_k) V',
+  };
+}
+
+function slabFFN(layerIdx, side) {
+  const html = `<div class="slab-plate">
+    <div class="slab-title">${side === 'enc' ? 'Enc' : 'Dec'} L${layerIdx}: FFN</div>
+    <div class="slab-content">
+      <div class="ffn-vis">
+        <div class="ffn-block">${state.d_model}</div>
+        <span style="color:#6e7681;font-size:9px;">→ReLU→</span>
+        <div class="ffn-block wide" style="min-width:${Math.min(80, state.d_ff / 8)}px;">${state.d_ff}</div>
+        <span style="color:#6e7681;font-size:9px;">→</span>
+        <div class="ffn-block">${state.d_model}</div>
+      </div>
+      ${state.show_shapes ? `<div class="slab-shape">(1, ${side === 'cross' ? 1 : state.seq_len}, ${state.d_model})</div>` : ''}
+    </div>
+  </div>`;
+  return {
+    html, type: 'ffn',
+    title: 'Feed-Forward Network',
+    desc: `Mở rộng ${state.d_model} → ${state.d_ff}, ReLU, chiếu về ${state.d_model}. Áp dụng độc lập từng vị trí (không trộn giữa các token).`,
+    shape: `(1, *, ${state.d_model})`,
+    formula: 'FFN(x) = ReLU(xW₁ + b₁)W₂ + b₂',
+  };
+}
+
+function slabOutput() {
+  const vocabSize = 15;
+  const target = computeTarget(state.src, state.task);
+  const targetTok = target[0] !== undefined ? target[0] : 3;
+  const probs = [];
+  for (let i = 0; i < vocabSize; i++) {
+    const d = Math.abs(i - targetTok);
+    probs.push(Math.exp(-d * d / 1.5));
+  }
+  const sum = probs.reduce((a, b) => a + b, 0);
+  const max = Math.max(...probs);
+  const bars = probs.map((p, i) => {
+    const isWinner = i === targetTok;
+    return `<div class="vocab-bar-3d ${isWinner ? 'winner' : ''}" style="height:${(p / max) * 100}%"></div>`;
+  }).join('');
+  const html = `<div class="slab-plate">
+    <div class="slab-title">Linear → Softmax (vocab=${vocabSize})</div>
+    <div class="slab-content">
+      <div class="vocab-bars-3d">${bars}</div>
+      <div style="margin-top:6px;font-size:10px;color:#56d364;">argmax → ${tokenLabel(targetTok)}</div>
+      ${state.show_shapes ? `<div class="slab-shape">(1, 1, ${vocabSize})</div>` : ''}
+    </div>
+  </div>`;
+  return {
+    html, type: 'output',
+    title: 'Output projection',
+    desc: 'Linear chiếu d_model → vocab_size. Softmax cho phân phối. Argmax = token kế tiếp được sinh.',
+    shape: `(1, 1, ${vocabSize})`,
+    formula: 'p = softmax(W_out · h + b_out)',
+  };
+}
+
+function slabPredicted() {
+  const target = computeTarget(state.src, state.task);
+  const html = `<div class="slab-plate" style="border-color:#56d364;">
+    <div class="slab-title" style="color:#56d364;">Predicted (autoregressive)</div>
+    <div class="slab-content">
+      <div class="token-row">
+        ${target.map(id => `
+          <div class="token-box" style="background:${tokenColor(id)}">${tokenLabel(id)}</div>
+        `).join('')}
+        <div class="token-box" style="background:#6e7681;color:#e6edf3">EOS</div>
+      </div>
+      ${state.show_shapes ? `<div class="slab-shape">${state.task}: ${JSON.stringify(state.src)} → ${JSON.stringify(target)}</div>` : ''}
+    </div>
+  </div>`;
+  return {
+    html, type: 'predicted',
+    title: 'Final output',
+    desc: `Token sinh autoregressive đến khi gặp EOS. Task = ${state.task}.`,
+    shape: `output = ${JSON.stringify(target)}`,
+    formula: 'while not EOS: y_t = argmax decode(y_{<t}, memory)',
+  };
+}
+
+// ============================================================================
+// Build & layout
+// ============================================================================
+function buildScene() {
+  const world = document.getElementById('world');
+  world.innerHTML = '';
+
+  const slabs = [];
+  slabs.push(slabInput());
+  slabs.push(slabEmbedding());
+  slabs.push(slabPosEnc());
+  // Encoder stack
+  for (let l = 1; l <= state.enc_layers; l++) {
+    slabs.push(slabAttention(l, 'self-enc'));
+    slabs.push(slabFFN(l, 'enc'));
+  }
+  // Memory marker
+  slabs.push({
+    html: `<div class="slab-plate" style="border-color:#a371f7;">
+      <div class="slab-title" style="color:#a371f7;">→ Memory (encoder output)</div>
+      <div class="slab-content" style="padding:4px 0;font-size:10px;color:#8b949e;">
+        Truyền cho mọi decoder layer qua cross-attention
+        ${state.show_shapes ? `<div class="slab-shape">(1, ${state.seq_len}, ${state.d_model})</div>` : ''}
+      </div>
+    </div>`,
+    type: 'memory',
+    title: 'Memory',
+    desc: 'Output cuối encoder. Mọi decoder layer dùng cùng tensor này làm K, V cho cross-attention.',
+    shape: `(1, ${state.seq_len}, ${state.d_model})`,
+    formula: 'memory = encoder(src)',
+  });
+  // Decoder stack
+  for (let l = 1; l <= state.dec_layers; l++) {
+    slabs.push(slabAttention(l, 'self-dec-masked'));
+    slabs.push(slabAttention(l, 'cross'));
+    slabs.push(slabFFN(l, 'dec'));
+  }
+  slabs.push(slabOutput());
+  slabs.push(slabPredicted());
+
+  const spacing = state.spacing;
+  const totalH = slabs.length * spacing;
+  const offsetZ = -totalH / 2;
+
+  slabs.forEach((slab, idx) => {
+    const z = offsetZ + idx * spacing;
+    const div = document.createElement('div');
+    div.className = 'slab';
+    div.dataset.id = idx;
+    div.style.transform = `translate3d(-50%, -50%, ${z}px)`;
+    div.innerHTML = slab.html;
+    div.addEventListener('click', (e) => {
+      e.stopPropagation();
+      focusSlab(idx, slab);
+    });
+    world.appendChild(div);
+
+    // Connector pillar between slabs
+    if (idx < slabs.length - 1) {
+      const pillar = document.createElement('div');
+      pillar.className = 'pillar' + (state.show_flow ? ' flow' : '');
+      pillar.style.transform = `translate3d(-50%, -50%, ${z + spacing / 2}px) rotateX(90deg)`;
+      pillar.style.height = (spacing - 20) + 'px';
+      world.appendChild(pillar);
+    }
+  });
+
+  updateStats(slabs.length);
+}
+
+function focusSlab(idx, slab) {
+  document.querySelectorAll('.slab').forEach(el => el.classList.remove('focused'));
+  const target = document.querySelector(`.slab[data-id="${idx}"]`);
+  if (target) target.classList.add('focused');
+  state.focused_id = idx;
+  const card = document.getElementById('info-card');
+  card.innerHTML = `
+    <h2>${slab.title}</h2>
+    <div class="desc">${slab.desc}</div>
+    <div class="shape-row">${slab.shape}</div>
+    <div class="formula">${slab.formula}</div>
+  `;
+}
+
+function updateStats(numSlabs) {
+  const params = estimateParams();
+  document.getElementById('stats').innerHTML = `
+    <div><span class="key">slabs:</span> <span class="val">${numSlabs}</span></div>
+    <div><span class="key">params:</span> <span class="val">~${formatParams(params)}</span></div>
+    <div><span class="key">d_k:</span> <span class="val">${state.d_model / state.num_heads}</span></div>
+    <div><span class="key">view:</span> <span class="val">X=${state.rot_x}° Z=${state.rot_z}°</span></div>
+  `;
+}
+
+function estimateParams() {
+  // very rough: each layer ~ 4*d^2 (attn) + 2*d*d_ff (ffn)
+  const dec = state.d_model;
+  const perEnc = 4 * dec * dec + 2 * dec * state.d_ff;
+  const perDec = 6 * dec * dec + 2 * dec * state.d_ff;  // 2 attn blocks
+  const vocab = 15;
+  const embed = vocab * dec * 2;
+  return embed + state.enc_layers * perEnc + state.dec_layers * perDec + dec * vocab;
+}
+function formatParams(n) {
+  if (n > 1e6) return (n / 1e6).toFixed(2) + 'M';
+  if (n > 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return n.toString();
+}
+
+function applyView() {
+  const world = document.getElementById('world');
+  world.style.transform = `translate(-50%, -50%) scale(${state.zoom}) rotateX(${state.rot_x}deg) rotateZ(${state.rot_z}deg)`;
+  document.getElementById('rotx-val').textContent = state.rot_x + '°';
+  document.getElementById('rotz-val').textContent = state.rot_z + '°';
+}
+
+// ============================================================================
+// Controls
+// ============================================================================
+function setupControls() {
+  // Sliders
+  document.getElementById('seq-len').addEventListener('input', e => {
+    state.seq_len = parseInt(e.target.value);
+    // Resize src to seq_len
+    const tokens = [];
+    for (let i = 0; i < state.seq_len; i++) {
+      tokens.push(state.src[i] !== undefined ? state.src[i] : 3 + (i % 12));
+    }
+    state.src = tokens;
+    document.getElementById('src-input').value = state.src.join(',');
+    document.getElementById('src-display').textContent = '[' + state.src.join(',') + ']';
+    document.getElementById('seq-len-val').textContent = state.seq_len;
+    updatePred();
+    buildScene();
+  });
+
+  document.getElementById('src-input').addEventListener('change', e => {
+    const tokens = e.target.value.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n >= 3 && n <= 14);
+    if (tokens.length === 0) return;
+    state.src = tokens;
+    state.seq_len = tokens.length;
+    document.getElementById('seq-len').value = state.seq_len;
+    document.getElementById('seq-len-val').textContent = state.seq_len;
+    document.getElementById('src-display').textContent = '[' + state.src.join(',') + ']';
+    updatePred();
+    buildScene();
+  });
+
+  // d_model toggles (must keep num_heads valid)
+  document.querySelectorAll('#d-model-toggles .toggle').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('#d-model-toggles .toggle').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      state.d_model = parseInt(t.dataset.val);
+      // Ensure heads divides d_model
+      if (state.d_model % state.num_heads !== 0) {
+        state.num_heads = Math.min(state.d_model, 8);
+        // pick closest valid
+        while (state.d_model % state.num_heads !== 0) state.num_heads--;
+        document.querySelectorAll('#heads-toggles .toggle').forEach(x => {
+          x.classList.toggle('active', parseInt(x.dataset.val) === state.num_heads);
+        });
+        document.getElementById('num-heads-val').textContent = state.num_heads;
+      }
+      document.getElementById('d-model-val').textContent = state.d_model;
+      buildScene();
+    });
+  });
+
+  // num_heads toggles
+  document.querySelectorAll('#heads-toggles .toggle').forEach(t => {
+    t.addEventListener('click', () => {
+      const v = parseInt(t.dataset.val);
+      if (state.d_model % v !== 0) {
+        t.style.animation = 'none';
+        t.offsetHeight;
+        t.style.animation = 'shake 0.3s';
+        return;
+      }
+      document.querySelectorAll('#heads-toggles .toggle').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      state.num_heads = v;
+      document.getElementById('num-heads-val').textContent = state.num_heads;
+      buildScene();
+    });
+  });
+
+  document.getElementById('d-ff').addEventListener('input', e => {
+    state.d_ff = parseInt(e.target.value);
+    document.getElementById('d-ff-val').textContent = state.d_ff;
+    buildScene();
+  });
+
+  document.getElementById('enc-layers').addEventListener('input', e => {
+    state.enc_layers = parseInt(e.target.value);
+    document.getElementById('enc-layers-val').textContent = state.enc_layers;
+    buildScene();
+  });
+  document.getElementById('dec-layers').addEventListener('input', e => {
+    state.dec_layers = parseInt(e.target.value);
+    document.getElementById('dec-layers-val').textContent = state.dec_layers;
+    buildScene();
+  });
+
+  document.querySelectorAll('#task-toggles .toggle').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('#task-toggles .toggle').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      state.task = t.dataset.val;
+      updatePred();
+      buildScene();
+    });
+  });
+
+  document.getElementById('rot-x').addEventListener('input', e => {
+    state.rot_x = parseInt(e.target.value);
+    applyView();
+  });
+  document.getElementById('rot-z').addEventListener('input', e => {
+    state.rot_z = parseInt(e.target.value);
+    applyView();
+  });
+  document.getElementById('spacing').addEventListener('input', e => {
+    state.spacing = parseInt(e.target.value);
+    document.getElementById('spacing-val').textContent = state.spacing;
+    buildScene();
+  });
+
+  document.getElementById('show-flow').addEventListener('change', e => {
+    state.show_flow = e.target.checked;
+    buildScene();
+  });
+  document.getElementById('show-shapes').addEventListener('change', e => {
+    state.show_shapes = e.target.checked;
+    buildScene();
+  });
+
+  document.getElementById('reset-view').addEventListener('click', () => {
+    state.rot_x = -58;
+    state.rot_z = 35;
+    state.zoom = 1;
+    document.getElementById('rot-x').value = -58;
+    document.getElementById('rot-z').value = 35;
+    applyView();
+  });
+}
+
+function updatePred() {
+  const target = computeTarget(state.src, state.task);
+  document.getElementById('pred-tokens').textContent = '[' + target.join(', ') + ']';
+}
+
+// ============================================================================
+// Mouse interaction
+// ============================================================================
+function setupMouse() {
+  const wrap = document.getElementById('scene-wrap');
+  let dragging = false;
+  let lastX, lastY;
+
+  wrap.addEventListener('mousedown', e => {
+    dragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    wrap.classList.add('dragging');
+  });
+  window.addEventListener('mouseup', () => {
+    dragging = false;
+    wrap.classList.remove('dragging');
+  });
+  window.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    state.rot_z += dx * 0.5;
+    state.rot_x -= dy * 0.5;
+    state.rot_x = Math.max(-90, Math.min(0, state.rot_x));
+    document.getElementById('rot-x').value = Math.round(state.rot_x);
+    document.getElementById('rot-z').value = Math.round(state.rot_z);
+    lastX = e.clientX;
+    lastY = e.clientY;
+    applyView();
+  });
+
+  wrap.addEventListener('wheel', e => {
+    e.preventDefault();
+    state.zoom *= e.deltaY > 0 ? 0.92 : 1.08;
+    state.zoom = Math.max(0.3, Math.min(2.5, state.zoom));
+    applyView();
+  }, { passive: false });
+}
+
+// ============================================================================
+// Init
+// ============================================================================
+setupControls();
+setupMouse();
+buildScene();
+applyView();
+updatePred();
+
+</script>
+</body>
+</html>
